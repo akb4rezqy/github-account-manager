@@ -1,32 +1,67 @@
-const API_URL = 'http://localhost:3000/api';
+const API_URL = window.location.origin + '/api';
+// atau gunakan ini jika masih error:
+// const API_URL = 'http://localhost:3000/api';
+
 let allAccounts = [];
 let selectedAccounts = new Set();
 
+// ============ CHECK SERVER ============
+async function checkServer() {
+    try {
+        const response = await fetch('/api/health');
+        if (response.ok) {
+            console.log('✅ Server is running');
+            return true;
+        }
+    } catch (error) {
+        console.error('❌ Server not reachable:', error);
+        return false;
+    }
+    return false;
+}
+
 // ============ LOAD DATA ============
 async function loadData() {
+    const serverOk = await checkServer();
+    if (!serverOk) {
+        alert('❌ Server tidak merespon!\n\n' +
+              'Pastikan:\n' +
+              '1. Server berjalan (npm start)\n' +
+              '2. MongoDB Atlas terhubung\n' +
+              '3. Koneksi internet stabil');
+        return;
+    }
+    
     try {
         await Promise.all([loadAccounts(), loadStatistics()]);
     } catch (error) {
         console.error('Error loading data:', error);
-        alert('❌ Gagal memuat data. Pastikan server berjalan.');
+        showNotification('❌ Gagal memuat data: ' + error.message, 'error');
     }
 }
 
 async function loadAccounts() {
     try {
         const response = await fetch(`${API_URL}/accounts`);
-        if (!response.ok) throw new Error('Failed to fetch accounts');
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to fetch accounts');
+        }
         allAccounts = await response.json();
         renderAccounts(allAccounts);
     } catch (error) {
         console.error('Error loading accounts:', error);
+        showNotification('❌ Gagal memuat akun: ' + error.message, 'error');
     }
 }
 
 async function loadStatistics() {
     try {
         const response = await fetch(`${API_URL}/statistics`);
-        if (!response.ok) throw new Error('Failed to fetch statistics');
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to fetch statistics');
+        }
         const stats = await response.json();
         
         document.getElementById('total').textContent = stats.total || 0;
@@ -36,7 +71,28 @@ async function loadStatistics() {
         document.getElementById('personal').textContent = stats.personal || 0;
     } catch (error) {
         console.error('Error loading statistics:', error);
+        showNotification('❌ Gagal memuat statistik: ' + error.message, 'error');
     }
+}
+
+// ============ NOTIFICATION ============
+function showNotification(message, type = 'info') {
+    // Buat notification element
+    const existing = document.querySelector('.notification');
+    if (existing) existing.remove();
+    
+    const notif = document.createElement('div');
+    notif.className = `notification ${type}`;
+    notif.innerHTML = `
+        <span>${message}</span>
+        <button onclick="this.parentElement.remove()" style="background: none; border: none; color: white; font-size: 20px; cursor: pointer;">&times;</button>
+    `;
+    document.body.appendChild(notif);
+    
+    // Auto hide after 5 seconds
+    setTimeout(() => {
+        if (notif.parentElement) notif.remove();
+    }, 5000);
 }
 
 // ============ RENDER ACCOUNTS ============
@@ -88,7 +144,6 @@ function renderAccounts(accounts) {
         `;
     }).join('');
     
-    // Reset selected accounts
     selectedAccounts.clear();
     document.getElementById('selectAll').checked = false;
 }
@@ -158,7 +213,7 @@ document.getElementById('addAccountForm').addEventListener('submit', async (e) =
     const totp = document.getElementById('totp').value;
     
     if (!username || !password) {
-        alert('❌ Username dan password wajib diisi!');
+        showNotification('❌ Username dan password wajib diisi!', 'error');
         return;
     }
     
@@ -174,12 +229,12 @@ document.getElementById('addAccountForm').addEventListener('submit', async (e) =
             throw new Error(error.error || 'Failed to add account');
         }
         
-        alert('✅ Akun berhasil ditambahkan!');
+        showNotification('✅ Akun berhasil ditambahkan!', 'success');
         hideAddForm();
         loadData();
     } catch (error) {
         console.error('Error adding account:', error);
-        alert('❌ Gagal menambahkan akun: ' + error.message);
+        showNotification('❌ Gagal menambahkan akun: ' + error.message, 'error');
     }
 });
 
@@ -200,7 +255,7 @@ async function submitBulk() {
     const lines = data.split('\n').filter(line => line.trim());
     
     if (lines.length === 0) {
-        alert('❌ Masukkan data akun!');
+        showNotification('❌ Masukkan data akun!', 'error');
         return;
     }
     
@@ -215,7 +270,7 @@ async function submitBulk() {
     }).filter(acc => acc && acc.username && acc.password);
     
     if (accounts.length === 0) {
-        alert('❌ Format data salah! Gunakan: email:username:password:totp');
+        showNotification('❌ Format data salah! Gunakan: email:username:password:totp', 'error');
         return;
     }
     
@@ -234,12 +289,12 @@ async function submitBulk() {
         }
         
         const result = await response.json();
-        alert(`✅ ${result.message}`);
+        showNotification(`✅ ${result.message}`, 'success');
         hideBulkForm();
         loadData();
     } catch (error) {
         console.error('Error adding accounts:', error);
-        alert('❌ Gagal menambahkan akun: ' + error.message);
+        showNotification('❌ Gagal menambahkan akun: ' + error.message, 'error');
     }
 }
 
@@ -249,7 +304,6 @@ function showBulkStatus() {
     document.getElementById('addForm').classList.add('hidden');
     document.getElementById('bulkForm').classList.add('hidden');
     
-    // Tampilkan daftar akun yang bisa dipilih
     const list = document.getElementById('statusAccountList');
     if (allAccounts.length === 0) {
         list.innerHTML = '<p style="color: #888; padding: 20px;">Belum ada akun</p>';
@@ -291,7 +345,7 @@ async function updateBulkStatus(status) {
     const ids = Array.from(window.statusSelected || []);
     
     if (ids.length === 0) {
-        alert('❌ Pilih minimal 1 akun!');
+        showNotification('❌ Pilih minimal 1 akun!', 'error');
         return;
     }
     
@@ -313,12 +367,12 @@ async function updateBulkStatus(status) {
         }
         
         const result = await response.json();
-        alert(`✅ ${result.message}`);
+        showNotification(`✅ ${result.message}`, 'success');
         hideStatusForm();
         loadData();
     } catch (error) {
         console.error('Error updating status:', error);
-        alert('❌ Gagal mengupdate status: ' + error.message);
+        showNotification('❌ Gagal mengupdate status: ' + error.message, 'error');
     }
 }
 
@@ -326,7 +380,7 @@ async function updateBulkStatus(status) {
 function showDetail(id) {
     const account = allAccounts.find(a => a._id === id);
     if (!account) {
-        alert('❌ Akun tidak ditemukan');
+        showNotification('❌ Akun tidak ditemukan', 'error');
         return;
     }
     
@@ -409,7 +463,7 @@ function editAccount(id) {
     
     const parts = input.split('|').map(p => p.trim());
     if (parts.length < 4) {
-        alert('❌ Format salah! Gunakan: username|email|password|totp');
+        showNotification('❌ Format salah! Gunakan: username|email|password|totp', 'error');
         return;
     }
     
@@ -436,11 +490,11 @@ async function updateAccount(id, data) {
             throw new Error(error.error || 'Failed to update account');
         }
         
-        alert('✅ Akun berhasil diupdate!');
+        showNotification('✅ Akun berhasil diupdate!', 'success');
         loadData();
     } catch (error) {
         console.error('Error updating account:', error);
-        alert('❌ Gagal mengupdate akun: ' + error.message);
+        showNotification('❌ Gagal mengupdate akun: ' + error.message, 'error');
     }
 }
 
@@ -467,11 +521,11 @@ async function deleteAccount(id) {
             throw new Error(error.error || 'Failed to delete account');
         }
         
-        alert('✅ Akun berhasil dihapus!');
+        showNotification('✅ Akun berhasil dihapus!', 'success');
         loadData();
     } catch (error) {
         console.error('Error deleting account:', error);
-        alert('❌ Gagal menghapus akun: ' + error.message);
+        showNotification('❌ Gagal menghapus akun: ' + error.message, 'error');
     }
 }
 
