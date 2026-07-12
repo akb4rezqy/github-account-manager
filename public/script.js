@@ -1,7 +1,4 @@
 const API_URL = window.location.origin + '/api';
-// atau gunakan ini jika masih error:
-// const API_URL = 'http://localhost:3000/api';
-
 let allAccounts = [];
 let selectedAccounts = new Set();
 
@@ -77,7 +74,6 @@ async function loadStatistics() {
 
 // ============ NOTIFICATION ============
 function showNotification(message, type = 'info') {
-    // Buat notification element
     const existing = document.querySelector('.notification');
     if (existing) existing.remove();
     
@@ -89,7 +85,6 @@ function showNotification(message, type = 'info') {
     `;
     document.body.appendChild(notif);
     
-    // Auto hide after 5 seconds
     setTimeout(() => {
         if (notif.parentElement) notif.remove();
     }, 5000);
@@ -355,6 +350,9 @@ async function updateBulkStatus(status) {
     if (!confirm(`Ubah ${ids.length} akun menjadi "${statusLabel}"?`)) return;
     
     try {
+        console.log('📝 Updating status for IDs:', ids);
+        console.log('📝 New status:', status);
+        
         const response = await fetch(`${API_URL}/accounts/bulk/status`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -367,11 +365,13 @@ async function updateBulkStatus(status) {
         }
         
         const result = await response.json();
+        console.log('✅ Update result:', result);
+        
         showNotification(`✅ ${result.message}`, 'success');
         hideStatusForm();
-        loadData();
+        await loadData();
     } catch (error) {
-        console.error('Error updating status:', error);
+        console.error('❌ Error updating status:', error);
         showNotification('❌ Gagal mengupdate status: ' + error.message, 'error');
     }
 }
@@ -429,7 +429,6 @@ function closeModalOutside(event) {
     }
 }
 
-// Keyboard shortcut: ESC to close modal
 document.addEventListener('keydown', function(event) {
     if (event.key === 'Escape') {
         closeModal();
@@ -479,6 +478,8 @@ function editAccount(id) {
 
 async function updateAccount(id, data) {
     try {
+        console.log('📝 Updating account:', id, data);
+        
         const response = await fetch(`${API_URL}/accounts/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -491,9 +492,9 @@ async function updateAccount(id, data) {
         }
         
         showNotification('✅ Akun berhasil diupdate!', 'success');
-        loadData();
+        await loadData();
     } catch (error) {
-        console.error('Error updating account:', error);
+        console.error('❌ Error updating account:', error);
         showNotification('❌ Gagal mengupdate akun: ' + error.message, 'error');
     }
 }
@@ -512,6 +513,8 @@ async function deleteAccount(id) {
     if (!confirm(confirmMsg)) return;
     
     try {
+        console.log('🗑️ Deleting account:', id);
+        
         const response = await fetch(`${API_URL}/accounts/${id}`, {
             method: 'DELETE'
         });
@@ -522,9 +525,9 @@ async function deleteAccount(id) {
         }
         
         showNotification('✅ Akun berhasil dihapus!', 'success');
-        loadData();
+        await loadData();
     } catch (error) {
-        console.error('Error deleting account:', error);
+        console.error('❌ Error deleting account:', error);
         showNotification('❌ Gagal menghapus akun: ' + error.message, 'error');
     }
 }
