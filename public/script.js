@@ -97,7 +97,7 @@ function renderAccounts(accounts) {
     if (!accounts || accounts.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="7" style="text-align: center; padding: 40px; color: #888;">
+                <td colspan="8" style="text-align: center; padding: 40px; color: #888;">
                     <i class="fas fa-inbox" style="font-size: 40px; display: block; margin-bottom: 10px;"></i>
                     Belum ada akun. Tambahkan akun sekarang!
                 </td>
@@ -107,11 +107,19 @@ function renderAccounts(accounts) {
     }
 
     tbody.innerHTML = accounts.map(account => {
-        const statusClass = account.status === 'available' ? 'status-available' :
+        const statusClass = account.status === 'available' || account.status === 'available_3d' ? 'status-available' :
                            account.status === 'sold' ? 'status-sold' : 'status-personal';
         const statusLabel = account.status === 'available' ? '🟢 Tersedia' :
+                           account.status === 'available_3d' ? '🟡 3 Hari' :
                            account.status === 'sold' ? '🔴 Terjual' : '🔵 Pribadi';
         const days = account.days || 0;
+        const createdDate = new Date(account.created_at).toLocaleString('id-ID', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
         
         return `
             <tr>
@@ -123,6 +131,7 @@ function renderAccounts(accounts) {
                 <td><strong>${account.username}</strong></td>
                 <td>${account.email || '-'}</td>
                 <td>${days} hari</td>
+                <td>${createdDate}</td>
                 <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
                 <td>
                     <button class="btn-action btn-detail" onclick="showDetail('${account._id}')" title="Detail">
@@ -192,6 +201,7 @@ function showAddForm() {
     document.getElementById('addForm').classList.remove('hidden');
     document.getElementById('bulkForm').classList.add('hidden');
     document.getElementById('statusForm').classList.add('hidden');
+    document.getElementById('ambilForm').classList.add('hidden');
 }
 
 function hideAddForm() {
@@ -238,6 +248,7 @@ function showBulkAdd() {
     document.getElementById('bulkForm').classList.remove('hidden');
     document.getElementById('addForm').classList.add('hidden');
     document.getElementById('statusForm').classList.add('hidden');
+    document.getElementById('ambilForm').classList.add('hidden');
 }
 
 function hideBulkForm() {
@@ -293,11 +304,142 @@ async function submitBulk() {
     }
 }
 
+// ============ AMBIL AKUN ============
+function showAmbilForm() {
+    document.getElementById('ambilForm').classList.remove('hidden');
+    document.getElementById('addForm').classList.add('hidden');
+    document.getElementById('bulkForm').classList.add('hidden');
+    document.getElementById('statusForm').classList.add('hidden');
+    
+    // Tampilkan daftar akun yang available
+    const list = document.getElementById('ambilAccountList');
+    const availableAccounts = allAccounts.filter(acc => 
+        acc.status === 'available' || acc.status === 'available_3d'
+    );
+    
+    if (availableAccounts.length === 0) {
+        list.innerHTML = '<p style="color: #888; padding: 20px;">Tidak ada akun yang tersedia</p>';
+        return;
+    }
+    
+    list.innerHTML = availableAccounts.map(acc => {
+        const statusLabel = acc.status === 'available' ? 'Tersedia' : '3 Hari';
+        return `
+            <div style="padding: 10px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 10px;">
+                <input type="checkbox" class="ambil-checkbox" value="${acc._id}" 
+                       onchange="toggleAmbilAccount('${acc._id}')">
+                <strong>${acc.username}</strong> 
+                (${acc.email || '-'}) - 
+                <span class="status-badge status-available">${statusLabel}</span>
+                <span style="color: #888; font-size: 12px;">${acc.days || 0} hari</span>
+            </div>
+        `;
+    }).join('');
+    
+    window.ambilSelected = new Set();
+}
+
+function toggleAmbilAccount(id) {
+    if (window.ambilSelected.has(id)) {
+        window.ambilSelected.delete(id);
+    } else {
+        window.ambilSelected.add(id);
+    }
+}
+
+function hideAmbilForm() {
+    document.getElementById('ambilForm').classList.add('hidden');
+}
+
+async function ambilAkun() {
+    const ids = Array.from(window.ambilSelected || []);
+    
+    if (ids.length === 0) {
+        showNotification('❌ Pilih minimal 1 akun!', 'error');
+        return;
+    }
+    
+    // Ambil data akun
+    const accounts = allAccounts.filter(acc => ids.includes(acc._id));
+    
+    // Format: email:username:password:totp
+    let text = accounts.map(acc => {
+        return `${acc.email || ''}:${acc.username}:${acc.password}:${acc.totp || ''}`;
+    }).join('\n');
+    
+    // Tampilkan pilihan
+    const choice = confirm(
+        `📤 ${accounts.length} akun siap diambil!\n\n` +
+        `Pilih:\n` +
+        `• OK = Salin ke clipboard\n` +
+        `• Cancel = Download sebagai TXT`
+    );
+    
+    if (choice) {
+        // Salin ke clipboard
+        try {
+            await navigator.clipboard.writeText(text);
+            showNotification(`✅ ${accounts.length} akun berhasil disalin ke clipboard!`, 'success');
+            
+            // Ubah status menjadi sold
+            await updateStatusAkun(ids, 'sold');
+            hideAmbilForm();
+        } catch (err) {
+            // Fallback jika clipboard gagal
+            copyToClipboardFallback(text);
+        }
+    } else {
+        // Download sebagai TXT
+        const blob = new Blob([text], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `akun_${new Date().toISOString().slice(0,10)}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+        
+        showNotification(`✅ ${accounts.length} akun berhasil di-download!`, 'success');
+        
+        // Ubah status menjadi sold
+        await updateStatusAkun(ids, 'sold');
+        hideAmbilForm();
+    }
+}
+
+function copyToClipboardFallback(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+    showNotification('✅ Akun berhasil disalin ke clipboard!', 'success');
+}
+
+async function updateStatusAkun(ids, status) {
+    try {
+        const response = await fetch(`${API_URL}/accounts/bulk/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids, status })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to update status');
+        }
+        
+        await loadData();
+    } catch (error) {
+        console.error('Error updating status:', error);
+    }
+}
+
 // ============ BULK STATUS ============
 function showBulkStatus() {
     document.getElementById('statusForm').classList.remove('hidden');
     document.getElementById('addForm').classList.add('hidden');
     document.getElementById('bulkForm').classList.add('hidden');
+    document.getElementById('ambilForm').classList.add('hidden');
     
     const list = document.getElementById('statusAccountList');
     if (allAccounts.length === 0) {
@@ -306,9 +448,10 @@ function showBulkStatus() {
     }
     
     list.innerHTML = allAccounts.map(acc => {
-        const statusClass = acc.status === 'available' ? 'status-available' :
+        const statusClass = acc.status === 'available' || acc.status === 'available_3d' ? 'status-available' :
                            acc.status === 'sold' ? 'status-sold' : 'status-personal';
         const statusLabel = acc.status === 'available' ? 'Tersedia' :
+                           acc.status === 'available_3d' ? '3 Hari' :
                            acc.status === 'sold' ? 'Terjual' : 'Pribadi';
         return `
             <div style="padding: 10px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 10px;">
@@ -345,7 +488,8 @@ async function updateBulkStatus(status) {
     }
     
     const statusLabel = status === 'sold' ? 'Terjual' : 
-                        status === 'personal' ? 'Pribadi' : 'Tersedia';
+                        status === 'personal' ? 'Pribadi' : 
+                        status === 'available_3d' ? '3 Hari' : 'Tersedia';
     
     if (!confirm(`Ubah ${ids.length} akun menjadi "${statusLabel}"?`)) return;
     
@@ -390,6 +534,15 @@ function showDetail(id) {
     
     title.textContent = `🔐 Detail Akun - ${account.username}`;
     
+    const createdDate = new Date(account.created_at).toLocaleString('id-ID', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+    
     body.innerHTML = `
         <div style="padding: 10px 0;">
             <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 15px;">
@@ -403,12 +556,12 @@ function showDetail(id) {
             </div>
             <div style="background: #d1ecf1; padding: 15px; border-radius: 10px;">
                 <p style="margin: 8px 0;"><strong>📌 Status:</strong> 
-                    <span class="status-badge ${account.status === 'available' ? 'status-available' : account.status === 'sold' ? 'status-sold' : 'status-personal'}">
-                        ${account.status === 'available' ? '🟢 Tersedia' : account.status === 'sold' ? '🔴 Terjual' : '🔵 Pribadi'}
+                    <span class="status-badge ${account.status === 'available' || account.status === 'available_3d' ? 'status-available' : account.status === 'sold' ? 'status-sold' : 'status-personal'}">
+                        ${account.status === 'available' ? '🟢 Tersedia' : account.status === 'available_3d' ? '🟡 3 Hari' : account.status === 'sold' ? '🔴 Terjual' : '🔵 Pribadi'}
                     </span>
                 </p>
                 <p style="margin: 8px 0;"><strong>⏳ Umur:</strong> ${account.days || 0} hari</p>
-                <p style="margin: 8px 0;"><strong>📅 Dibuat:</strong> ${new Date(account.created_at).toLocaleString('id-ID')}</p>
+                <p style="margin: 8px 0;"><strong>📅 Ditambahkan:</strong> ${createdDate}</p>
             </div>
         </div>
     `;
