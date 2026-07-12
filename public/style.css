@@ -8,6 +8,7 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
     background: #f0f2f5;
     color: #333;
+    min-height: 100vh;
 }
 
 .container {
@@ -192,7 +193,7 @@ header h1 {
 }
 
 .hidden {
-    display: none;
+    display: none !important;
 }
 
 .btn-submit {
@@ -350,34 +351,77 @@ tr:hover {
     top: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0,0,0,0.5);
+    background: rgba(0,0,0,0.6);
     display: flex;
     align-items: center;
     justify-content: center;
+    animation: fadeIn 0.3s;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 .modal-content {
     background: white;
-    padding: 30px;
-    border-radius: 12px;
+    padding: 35px;
+    border-radius: 16px;
     max-width: 500px;
     width: 90%;
     max-height: 80vh;
     overflow-y: auto;
     position: relative;
+    animation: slideIn 0.3s;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+
+@keyframes slideIn {
+    from { transform: translateY(-30px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
 }
 
 .close {
     position: absolute;
     right: 20px;
     top: 15px;
-    font-size: 28px;
+    font-size: 32px;
     cursor: pointer;
     color: #888;
+    transition: all 0.3s;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: #f0f0f0;
+    line-height: 1;
 }
 
 .close:hover {
     color: #333;
+    background: #e0e0e0;
+    transform: rotate(90deg);
+}
+
+.btn-close-modal {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    padding: 12px 30px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    width: 100%;
+    margin-top: 20px;
+}
+
+.btn-close-modal:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
 /* Status Actions */
@@ -454,5 +498,9 @@ tr:hover {
     .actions button {
         width: 100%;
         justify-content: center;
+    }
+
+    .modal-content {
+        padding: 20px;
     }
 }
