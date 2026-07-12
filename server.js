@@ -42,12 +42,13 @@ const accountSchema = new mongoose.Schema({
     totp: { type: String, default: '' },
     status: { 
         type: String, 
-        enum: ['available', 'sold', 'personal'],
+        enum: ['available', 'sold', 'personal', 'available_3d'],
         default: 'available'
     },
     created_at: { type: Date, default: Date.now }
 });
 
+// Virtual field untuk umur akun
 accountSchema.virtual('days').get(function() {
     const now = new Date();
     const diff = now - this.created_at;
@@ -81,7 +82,7 @@ app.get('/api/statistics', async (req, res) => {
             created_at: { $gte: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) }
         });
         const available_7d = await Account.countDocuments({
-            status: 'available',
+            status: { $in: ['available', 'available_3d'] },
             created_at: { $lt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) }
         });
         const sold = await Account.countDocuments({ status: 'sold' });
@@ -115,7 +116,8 @@ app.post('/api/accounts', async (req, res) => {
             email: email || '',
             username: username.trim(),
             password: password.trim(),
-            totp: totp || ''
+            totp: totp || '',
+            created_at: new Date()
         });
 
         await account.save();
@@ -145,7 +147,8 @@ app.post('/api/accounts/bulk', async (req, res) => {
                     email: email || '',
                     username: username.trim(),
                     password: password.trim(),
-                    totp: totp || ''
+                    totp: totp || '',
+                    created_at: new Date()
                 });
                 await account.save();
                 created.push(account);
@@ -162,9 +165,9 @@ app.post('/api/accounts/bulk', async (req, res) => {
     }
 });
 
-// ============ ROUTE UPDATE STATUS (HARUS DIURUTKAN) ============
+// ============ UPDATE STATUS ============
 
-// PUT update status (bulk) - HARUS DIATAS route :id
+// PUT update status (bulk)
 app.put('/api/accounts/bulk/status', async (req, res) => {
     try {
         console.log('📝 Bulk status update:', req.body);
@@ -174,8 +177,7 @@ app.put('/api/accounts/bulk/status', async (req, res) => {
             return res.status(400).json({ error: 'ID tidak valid' });
         }
 
-        // Validasi status
-        if (!['available', 'sold', 'personal'].includes(status)) {
+        if (!['available', 'sold', 'personal', 'available_3d'].includes(status)) {
             return res.status(400).json({ error: 'Status tidak valid' });
         }
 
@@ -195,7 +197,7 @@ app.put('/api/accounts/bulk/status', async (req, res) => {
     }
 });
 
-// PUT update status (single) - HARUS DIBAWAH route bulk
+// PUT update status (single)
 app.put('/api/accounts/:id/status', async (req, res) => {
     try {
         const { status } = req.body;
