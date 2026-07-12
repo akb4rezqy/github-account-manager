@@ -7,14 +7,31 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// CORS
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 // Middleware
-app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Route utama
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Health check
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        status: 'ok', 
+        message: 'Server is running',
+        timestamp: new Date().toISOString(),
+        mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+    });
 });
 
 // ============ MONGODB SCHEMA ============
@@ -31,7 +48,6 @@ const accountSchema = new mongoose.Schema({
     created_at: { type: Date, default: Date.now }
 });
 
-// Virtual field untuk umur akun
 accountSchema.virtual('days').get(function() {
     const now = new Date();
     const diff = now - this.created_at;
@@ -51,6 +67,7 @@ app.get('/api/accounts', async (req, res) => {
         const accounts = await Account.find().sort({ created_at: -1 });
         res.json(accounts);
     } catch (error) {
+        console.error('Error fetching accounts:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -78,6 +95,7 @@ app.get('/api/statistics', async (req, res) => {
             personal
         });
     } catch (error) {
+        console.error('Error fetching statistics:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -85,6 +103,8 @@ app.get('/api/statistics', async (req, res) => {
 // POST tambah akun (single)
 app.post('/api/accounts', async (req, res) => {
     try {
+        console.log('📝 Received account data:', req.body);
+        
         const { email, username, password, totp } = req.body;
         
         if (!username || !password) {
@@ -93,14 +113,16 @@ app.post('/api/accounts', async (req, res) => {
 
         const account = new Account({
             email: email || '',
-            username,
-            password,
+            username: username.trim(),
+            password: password.trim(),
             totp: totp || ''
         });
 
         await account.save();
+        console.log('✅ Account saved:', account._id);
         res.status(201).json(account);
     } catch (error) {
+        console.error('❌ Error saving account:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -108,9 +130,10 @@ app.post('/api/accounts', async (req, res) => {
 // POST tambah multiple akun (bulk)
 app.post('/api/accounts/bulk', async (req, res) => {
     try {
+        console.log('📝 Received bulk data:', req.body);
         const { accounts } = req.body;
         
-        if (!accounts || !Array.isArray(accounts)) {
+        if (!accounts || !Array.isArray(accounts) || accounts.length === 0) {
             return res.status(400).json({ error: 'Data tidak valid' });
         }
 
@@ -120,8 +143,8 @@ app.post('/api/accounts/bulk', async (req, res) => {
             if (username && password) {
                 const account = new Account({
                     email: email || '',
-                    username,
-                    password,
+                    username: username.trim(),
+                    password: password.trim(),
                     totp: totp || ''
                 });
                 await account.save();
@@ -134,6 +157,7 @@ app.post('/api/accounts/bulk', async (req, res) => {
             accounts: created 
         });
     } catch (error) {
+        console.error('❌ Error saving bulk accounts:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -154,6 +178,7 @@ app.put('/api/accounts/:id/status', async (req, res) => {
         
         res.json(account);
     } catch (error) {
+        console.error('Error updating status:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -177,6 +202,7 @@ app.put('/api/accounts/bulk/status', async (req, res) => {
             modified: result.modifiedCount 
         });
     } catch (error) {
+        console.error('Error updating bulk status:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -204,6 +230,7 @@ app.put('/api/accounts/:id', async (req, res) => {
         
         res.json(account);
     } catch (error) {
+        console.error('Error updating account:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -217,6 +244,7 @@ app.delete('/api/accounts/:id', async (req, res) => {
         }
         res.json({ message: 'Akun berhasil dihapus' });
     } catch (error) {
+        console.error('Error deleting account:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -231,24 +259,48 @@ app.delete('/api/accounts/bulk', async (req, res) => {
             deleted: result.deletedCount 
         });
     } catch (error) {
+        console.error('Error deleting bulk accounts:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
 // ============ KONEKSI MONGODB ATLAS ============
+console.log('🔄 Connecting to MongoDB Atlas...');
+console.log(`📡 URI: ${process.env.MONGODB_URI ? process.env.MONGODB_URI.replace(/\/\/.*@/, '//****:****@') : 'NOT SET'}`);
+
 mongoose.connect(process.env.MONGODB_URI, {
     useNewUrlParser: true,
-    useUnifiedTopology: true
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 10000,
+    socketTimeoutMS: 45000,
 })
 .then(() => {
     console.log('✅ Connected to MongoDB Atlas');
-    app.listen(PORT, () => {
+    console.log(`📊 Database: ${mongoose.connection.db.databaseName}`);
+    console.log(`📍 Host: ${mongoose.connection.host}`);
+    
+    app.listen(PORT, '0.0.0.0', () => {
         console.log(`🚀 Server running on http://localhost:${PORT}`);
-        console.log(`📊 Open browser and visit: http://localhost:${PORT}`);
+        console.log(`📱 Open browser: http://localhost:${PORT}`);
     });
 })
 .catch(err => {
     console.error('❌ MongoDB connection error:', err);
-    console.log('⚠️  Pastikan MONGODB_URI di .env sudah benar');
-    process.exit(1);
+    console.log('\n⚠️  PASTIKAN:');
+    console.log('1. File .env ada dan berisi MONGODB_URI');
+    console.log('2. MONGODB_URI format: mongodb+srv://username:password@cluster.mongodb.net/database');
+    console.log('3. IP address sudah di-whitelist di MongoDB Atlas');
+    console.log('4. Username dan password benar (tanpa karakter special @)');
+    console.log('5. Koneksi internet stabil\n');
+    
+    // Jangan exit, biarkan server jalan tapi tanpa DB
+    console.log('⚠️  Server tetap berjalan tanpa database...');
+    app.listen(PORT, '0.0.0.0', () => {
+        console.log(`🚀 Server running (without DB) on http://localhost:${PORT}`);
+    });
+});
+
+// Error handling untuk unhandled rejections
+process.on('unhandledRejection', (err) => {
+    console.error('Unhandled Rejection:', err);
 });
