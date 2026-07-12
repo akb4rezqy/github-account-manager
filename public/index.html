@@ -73,7 +73,7 @@
             </button>
         </div>
 
-        <!-- Forms -->
+        <!-- Form Tambah Akun -->
         <div id="addForm" class="form-container hidden">
             <h3><i class="fas fa-plus-circle"></i> Tambah Akun</h3>
             <form id="addAccountForm">
@@ -88,6 +88,7 @@
             </form>
         </div>
 
+        <!-- Form Bulk Add -->
         <div id="bulkForm" class="form-container hidden">
             <h3><i class="fas fa-layer-group"></i> Bulk Tambah Akun</h3>
             <p class="form-hint">Format: email:username:password:totp (satu per baris)</p>
@@ -99,6 +100,7 @@
             <button type="button" onclick="hideBulkForm()" class="btn-cancel">Batal</button>
         </div>
 
+        <!-- Form Ubah Status -->
         <div id="statusForm" class="form-container hidden">
             <h3><i class="fas fa-edit"></i> Ubah Status</h3>
             <p class="form-hint">Pilih akun yang ingin diubah statusnya</p>
@@ -153,11 +155,14 @@
     </div>
 
     <!-- Modal untuk detail akun -->
-    <div id="accountModal" class="modal hidden">
+    <div id="accountModal" class="modal hidden" onclick="closeModalOutside(event)">
         <div class="modal-content">
             <span class="close" onclick="closeModal()">&times;</span>
-            <h2>Detail Akun</h2>
+            <h2 id="modalTitle">Detail Akun</h2>
             <div id="modalBody"></div>
+            <button onclick="closeModal()" class="btn-close-modal">
+                <i class="fas fa-times"></i> Tutup
+            </button>
         </div>
     </div>
 
