@@ -162,7 +162,40 @@ app.post('/api/accounts/bulk', async (req, res) => {
     }
 });
 
-// PUT update status (single)
+// ============ ROUTE UPDATE STATUS (HARUS DIURUTKAN) ============
+
+// PUT update status (bulk) - HARUS DIATAS route :id
+app.put('/api/accounts/bulk/status', async (req, res) => {
+    try {
+        console.log('📝 Bulk status update:', req.body);
+        const { ids, status } = req.body;
+        
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ error: 'ID tidak valid' });
+        }
+
+        // Validasi status
+        if (!['available', 'sold', 'personal'].includes(status)) {
+            return res.status(400).json({ error: 'Status tidak valid' });
+        }
+
+        const result = await Account.updateMany(
+            { _id: { $in: ids } },
+            { status }
+        );
+
+        console.log(`✅ Updated ${result.modifiedCount} accounts`);
+        res.json({ 
+            message: `Berhasil update ${result.modifiedCount} akun`,
+            modified: result.modifiedCount 
+        });
+    } catch (error) {
+        console.error('❌ Error updating bulk status:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// PUT update status (single) - HARUS DIBAWAH route bulk
 app.put('/api/accounts/:id/status', async (req, res) => {
     try {
         const { status } = req.body;
@@ -179,30 +212,6 @@ app.put('/api/accounts/:id/status', async (req, res) => {
         res.json(account);
     } catch (error) {
         console.error('Error updating status:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// PUT update status (bulk)
-app.put('/api/accounts/bulk/status', async (req, res) => {
-    try {
-        const { ids, status } = req.body;
-        
-        if (!ids || !Array.isArray(ids) || ids.length === 0) {
-            return res.status(400).json({ error: 'ID tidak valid' });
-        }
-
-        const result = await Account.updateMany(
-            { _id: { $in: ids } },
-            { status }
-        );
-
-        res.json({ 
-            message: `Berhasil update ${result.modifiedCount} akun`,
-            modified: result.modifiedCount 
-        });
-    } catch (error) {
-        console.error('Error updating bulk status:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -266,7 +275,6 @@ app.delete('/api/accounts/bulk', async (req, res) => {
 
 // ============ KONEKSI MONGODB ATLAS ============
 console.log('🔄 Connecting to MongoDB Atlas...');
-console.log(`📡 URI: ${process.env.MONGODB_URI ? process.env.MONGODB_URI.replace(/\/\/.*@/, '//****:****@') : 'NOT SET'}`);
 
 mongoose.connect(process.env.MONGODB_URI, {
     useNewUrlParser: true,
@@ -277,7 +285,6 @@ mongoose.connect(process.env.MONGODB_URI, {
 .then(() => {
     console.log('✅ Connected to MongoDB Atlas');
     console.log(`📊 Database: ${mongoose.connection.db.databaseName}`);
-    console.log(`📍 Host: ${mongoose.connection.host}`);
     
     app.listen(PORT, '0.0.0.0', () => {
         console.log(`🚀 Server running on http://localhost:${PORT}`);
@@ -286,21 +293,12 @@ mongoose.connect(process.env.MONGODB_URI, {
 })
 .catch(err => {
     console.error('❌ MongoDB connection error:', err);
-    console.log('\n⚠️  PASTIKAN:');
-    console.log('1. File .env ada dan berisi MONGODB_URI');
-    console.log('2. MONGODB_URI format: mongodb+srv://username:password@cluster.mongodb.net/database');
-    console.log('3. IP address sudah di-whitelist di MongoDB Atlas');
-    console.log('4. Username dan password benar (tanpa karakter special @)');
-    console.log('5. Koneksi internet stabil\n');
-    
-    // Jangan exit, biarkan server jalan tapi tanpa DB
-    console.log('⚠️  Server tetap berjalan tanpa database...');
+    console.log('\n⚠️  Server tetap berjalan tanpa database...');
     app.listen(PORT, '0.0.0.0', () => {
         console.log(`🚀 Server running (without DB) on http://localhost:${PORT}`);
     });
 });
 
-// Error handling untuk unhandled rejections
 process.on('unhandledRejection', (err) => {
     console.error('Unhandled Rejection:', err);
 });
