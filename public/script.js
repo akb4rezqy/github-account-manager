@@ -8,7 +8,7 @@ async function loadData() {
         await Promise.all([loadAccounts(), loadStatistics()]);
     } catch (error) {
         console.error('Error loading data:', error);
-        alert('Gagal memuat data. Pastikan server berjalan.');
+        alert('❌ Gagal memuat data. Pastikan server berjalan.');
     }
 }
 
@@ -58,8 +58,9 @@ function renderAccounts(accounts) {
     tbody.innerHTML = accounts.map(account => {
         const statusClass = account.status === 'available' ? 'status-available' :
                            account.status === 'sold' ? 'status-sold' : 'status-personal';
-        const statusLabel = account.status === 'available' ? 'Tersedia' :
-                           account.status === 'sold' ? 'Terjual' : 'Pribadi';
+        const statusLabel = account.status === 'available' ? '🟢 Tersedia' :
+                           account.status === 'sold' ? '🔴 Terjual' : '🔵 Pribadi';
+        const days = account.days || 0;
         
         return `
             <tr>
@@ -67,25 +68,29 @@ function renderAccounts(accounts) {
                     <input type="checkbox" class="account-checkbox" 
                            value="${account._id}" onchange="toggleAccount('${account._id}')">
                 </td>
-                <td>#${account._id.slice(-6)}</td>
+                <td><code>#${account._id.slice(-6)}</code></td>
                 <td><strong>${account.username}</strong></td>
                 <td>${account.email || '-'}</td>
-                <td>${account.days || 0} hari</td>
+                <td>${days} hari</td>
                 <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
                 <td>
-                    <button class="btn-action btn-detail" onclick="showDetail('${account._id}')">
+                    <button class="btn-action btn-detail" onclick="showDetail('${account._id}')" title="Detail">
                         <i class="fas fa-eye"></i>
                     </button>
-                    <button class="btn-action btn-edit" onclick="editAccount('${account._id}')">
+                    <button class="btn-action btn-edit" onclick="editAccount('${account._id}')" title="Edit">
                         <i class="fas fa-edit"></i>
                     </button>
-                    <button class="btn-action btn-delete" onclick="deleteAccount('${account._id}')">
+                    <button class="btn-action btn-delete" onclick="deleteAccount('${account._id}')" title="Hapus">
                         <i class="fas fa-trash"></i>
                     </button>
                 </td>
             </tr>
         `;
     }).join('');
+    
+    // Reset selected accounts
+    selectedAccounts.clear();
+    document.getElementById('selectAll').checked = false;
 }
 
 // ============ FILTER ACCOUNTS ============
@@ -153,7 +158,7 @@ document.getElementById('addAccountForm').addEventListener('submit', async (e) =
     const totp = document.getElementById('totp').value;
     
     if (!username || !password) {
-        alert('Username dan password wajib diisi!');
+        alert('❌ Username dan password wajib diisi!');
         return;
     }
     
@@ -164,7 +169,10 @@ document.getElementById('addAccountForm').addEventListener('submit', async (e) =
             body: JSON.stringify({ email, username, password, totp })
         });
         
-        if (!response.ok) throw new Error('Failed to add account');
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to add account');
+        }
         
         alert('✅ Akun berhasil ditambahkan!');
         hideAddForm();
@@ -192,7 +200,7 @@ async function submitBulk() {
     const lines = data.split('\n').filter(line => line.trim());
     
     if (lines.length === 0) {
-        alert('Masukkan data akun!');
+        alert('❌ Masukkan data akun!');
         return;
     }
     
@@ -207,7 +215,7 @@ async function submitBulk() {
     }).filter(acc => acc && acc.username && acc.password);
     
     if (accounts.length === 0) {
-        alert('Format data salah! Gunakan: email:username:password:totp');
+        alert('❌ Format data salah! Gunakan: email:username:password:totp');
         return;
     }
     
@@ -220,7 +228,10 @@ async function submitBulk() {
             body: JSON.stringify({ accounts })
         });
         
-        if (!response.ok) throw new Error('Failed to add accounts');
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to add accounts');
+        }
         
         const result = await response.json();
         alert(`✅ ${result.message}`);
@@ -240,17 +251,26 @@ function showBulkStatus() {
     
     // Tampilkan daftar akun yang bisa dipilih
     const list = document.getElementById('statusAccountList');
-    list.innerHTML = allAccounts.map(acc => `
-        <div style="padding: 8px; border-bottom: 1px solid #eee;">
-            <input type="checkbox" class="status-checkbox" value="${acc._id}" 
-                   onchange="toggleStatusAccount('${acc._id}')">
-            <strong>${acc.username}</strong> 
-            (${acc.email || '-'}) - 
-            <span class="status-badge ${acc.status === 'available' ? 'status-available' : acc.status === 'sold' ? 'status-sold' : 'status-personal'}">
-                ${acc.status === 'available' ? 'Tersedia' : acc.status === 'sold' ? 'Terjual' : 'Pribadi'}
-            </span>
-        </div>
-    `).join('');
+    if (allAccounts.length === 0) {
+        list.innerHTML = '<p style="color: #888; padding: 20px;">Belum ada akun</p>';
+        return;
+    }
+    
+    list.innerHTML = allAccounts.map(acc => {
+        const statusClass = acc.status === 'available' ? 'status-available' :
+                           acc.status === 'sold' ? 'status-sold' : 'status-personal';
+        const statusLabel = acc.status === 'available' ? 'Tersedia' :
+                           acc.status === 'sold' ? 'Terjual' : 'Pribadi';
+        return `
+            <div style="padding: 10px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 10px;">
+                <input type="checkbox" class="status-checkbox" value="${acc._id}" 
+                       onchange="toggleStatusAccount('${acc._id}')">
+                <strong>${acc.username}</strong> 
+                (${acc.email || '-'}) - 
+                <span class="status-badge ${statusClass}">${statusLabel}</span>
+            </div>
+        `;
+    }).join('');
     
     window.statusSelected = new Set();
 }
@@ -271,7 +291,7 @@ async function updateBulkStatus(status) {
     const ids = Array.from(window.statusSelected || []);
     
     if (ids.length === 0) {
-        alert('Pilih minimal 1 akun!');
+        alert('❌ Pilih minimal 1 akun!');
         return;
     }
     
@@ -287,7 +307,10 @@ async function updateBulkStatus(status) {
             body: JSON.stringify({ ids, status })
         });
         
-        if (!response.ok) throw new Error('Failed to update status');
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to update status');
+        }
         
         const result = await response.json();
         alert(`✅ ${result.message}`);
@@ -302,40 +325,102 @@ async function updateBulkStatus(status) {
 // ============ DETAIL ACCOUNT ============
 function showDetail(id) {
     const account = allAccounts.find(a => a._id === id);
-    if (!account) return;
+    if (!account) {
+        alert('❌ Akun tidak ditemukan');
+        return;
+    }
     
     const modal = document.getElementById('accountModal');
     const body = document.getElementById('modalBody');
+    const title = document.getElementById('modalTitle');
+    
+    title.textContent = `🔐 Detail Akun - ${account.username}`;
     
     body.innerHTML = `
         <div style="padding: 10px 0;">
-            <p><strong>ID:</strong> ${account._id}</p>
-            <p><strong>Username:</strong> ${account.username}</p>
-            <p><strong>Email:</strong> ${account.email || '-'}</p>
-            <p><strong>Password:</strong> <code>${account.password}</code></p>
-            <p><strong>TOTP:</strong> ${account.totp || '-'}</p>
-            <p><strong>Status:</strong> ${account.status}</p>
-            <p><strong>Umur:</strong> ${account.days || 0} hari</p>
-            <p><strong>Dibuat:</strong> ${new Date(account.created_at).toLocaleString()}</p>
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 15px;">
+                <p style="margin: 8px 0;"><strong>🆔 ID:</strong> <code style="background: #fff; padding: 2px 8px; border-radius: 4px;">${account._id}</code></p>
+                <p style="margin: 8px 0;"><strong>👤 Username:</strong> <strong>${account.username}</strong></p>
+                <p style="margin: 8px 0;"><strong>📧 Email:</strong> ${account.email || '-'}</p>
+            </div>
+            <div style="background: #fff3cd; padding: 15px; border-radius: 10px; margin-bottom: 15px; border-left: 4px solid #ffc107;">
+                <p style="margin: 8px 0;"><strong>🔑 Password:</strong> <code style="background: #fff; padding: 2px 8px; border-radius: 4px;">${account.password}</code></p>
+                <p style="margin: 8px 0;"><strong>📱 TOTP:</strong> ${account.totp || '-'}</p>
+            </div>
+            <div style="background: #d1ecf1; padding: 15px; border-radius: 10px;">
+                <p style="margin: 8px 0;"><strong>📌 Status:</strong> 
+                    <span class="status-badge ${account.status === 'available' ? 'status-available' : account.status === 'sold' ? 'status-sold' : 'status-personal'}">
+                        ${account.status === 'available' ? '🟢 Tersedia' : account.status === 'sold' ? '🔴 Terjual' : '🔵 Pribadi'}
+                    </span>
+                </p>
+                <p style="margin: 8px 0;"><strong>⏳ Umur:</strong> ${account.days || 0} hari</p>
+                <p style="margin: 8px 0;"><strong>📅 Dibuat:</strong> ${new Date(account.created_at).toLocaleString('id-ID')}</p>
+            </div>
         </div>
     `;
     
     modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
 }
 
 function closeModal() {
-    document.getElementById('accountModal').classList.add('hidden');
+    const modal = document.getElementById('accountModal');
+    modal.classList.add('hidden');
+    document.body.style.overflow = 'auto';
 }
+
+function closeModalOutside(event) {
+    if (event.target === event.currentTarget) {
+        closeModal();
+    }
+}
+
+// Keyboard shortcut: ESC to close modal
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeModal();
+    }
+});
 
 // ============ EDIT ACCOUNT ============
 function editAccount(id) {
     const account = allAccounts.find(a => a._id === id);
     if (!account) return;
     
-    const newUsername = prompt('Username baru:', account.username);
-    if (newUsername !== null && newUsername !== account.username) {
-        updateAccount(id, { username: newUsername });
+    const fields = [
+        { key: 'username', label: 'Username', value: account.username },
+        { key: 'email', label: 'Email', value: account.email || '' },
+        { key: 'password', label: 'Password', value: account.password },
+        { key: 'totp', label: 'TOTP', value: account.totp || '' }
+    ];
+    
+    let message = '✏️ EDIT DATA AKUN\n\n';
+    fields.forEach(f => {
+        message += `${f.label}: ${f.value}\n`;
+    });
+    message += '\nMasukkan data baru dengan format:\n';
+    message += 'username|email|password|totp\n';
+    message += '(Kosongkan jika tidak diubah)\n\n';
+    message += 'Contoh: newuser|new@email.com|NewPass123|654321';
+    
+    const input = prompt(message, `${account.username}|${account.email || ''}|${account.password}|${account.totp || ''}`);
+    
+    if (input === null) return;
+    
+    const parts = input.split('|').map(p => p.trim());
+    if (parts.length < 4) {
+        alert('❌ Format salah! Gunakan: username|email|password|totp');
+        return;
     }
+    
+    const [username, email, password, totp] = parts;
+    const updateData = {};
+    if (username) updateData.username = username;
+    if (email !== undefined) updateData.email = email;
+    if (password) updateData.password = password;
+    if (totp !== undefined) updateData.totp = totp;
+    
+    updateAccount(id, updateData);
 }
 
 async function updateAccount(id, data) {
@@ -346,7 +431,10 @@ async function updateAccount(id, data) {
             body: JSON.stringify(data)
         });
         
-        if (!response.ok) throw new Error('Failed to update account');
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to update account');
+        }
         
         alert('✅ Akun berhasil diupdate!');
         loadData();
@@ -361,14 +449,23 @@ async function deleteAccount(id) {
     const account = allAccounts.find(a => a._id === id);
     if (!account) return;
     
-    if (!confirm(`Hapus akun "${account.username}"?`)) return;
+    const confirmMsg = `⚠️ HAPUS AKUN\n\n` +
+                       `Username: ${account.username}\n` +
+                       `Email: ${account.email || '-'}\n` +
+                       `Status: ${account.status}\n\n` +
+                       `Yakin ingin menghapus akun ini?`;
+    
+    if (!confirm(confirmMsg)) return;
     
     try {
         const response = await fetch(`${API_URL}/accounts/${id}`, {
             method: 'DELETE'
         });
         
-        if (!response.ok) throw new Error('Failed to delete account');
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to delete account');
+        }
         
         alert('✅ Akun berhasil dihapus!');
         loadData();
@@ -385,8 +482,3 @@ function refreshData() {
 
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded', loadData);
-
-// Click outside modal to close
-document.getElementById('accountModal').addEventListener('click', function(e) {
-    if (e.target === this) closeModal();
-});
