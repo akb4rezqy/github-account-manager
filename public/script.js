@@ -8,6 +8,7 @@ async function loadData() {
         await Promise.all([loadAccounts(), loadStatistics()]);
     } catch (error) {
         console.error('Error loading data:', error);
+        showNotification('❌ Gagal memuat data', 'error');
     }
 }
 
@@ -19,6 +20,7 @@ async function loadAccounts() {
         renderAccounts(allAccounts);
     } catch (error) {
         console.error('Error:', error);
+        showNotification('❌ Gagal memuat akun', 'error');
     }
 }
 
@@ -47,12 +49,11 @@ function renderAccounts(accounts) {
     }
 
     tbody.innerHTML = accounts.map(acc => {
-        const statusClass = acc.status === 'available' || acc.status === 'available_3d' ? 'status-available' :
-                           acc.status === 'sold' ? 'status-sold' : 'status-personal';
         const statusLabel = acc.status === 'available' ? 'Tersedia' :
                            acc.status === 'available_3d' ? '3 Hari' :
                            acc.status === 'sold' ? 'Terjual' : 'Pribadi';
         const date = new Date(acc.created_at).toLocaleString('id-ID');
+        const days = Math.floor((Date.now() - new Date(acc.created_at)) / (1000 * 60 * 60 * 24));
         
         return `
             <tr class="hover:bg-gray-50">
@@ -60,13 +61,13 @@ function renderAccounts(accounts) {
                 <td class="px-4 py-3 text-sm">#${acc._id.slice(-6)}</td>
                 <td class="px-4 py-3 font-medium">${acc.username}</td>
                 <td class="px-4 py-3 text-sm">${acc.email || '-'}</td>
-                <td class="px-4 py-3 text-sm">${acc.days || 0} hari</td>
+                <td class="px-4 py-3 text-sm">${days} hari</td>
                 <td class="px-4 py-3 text-sm">${date}</td>
-                <td class="px-4 py-3"><span class="status-badge ${statusClass}">${statusLabel}</span></td>
+                <td class="px-4 py-3"><span class="status-badge status-gray">${statusLabel}</span></td>
                 <td class="px-4 py-3">
-                    <button onclick="showDetail('${acc._id}')" class="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1 rounded text-xs">Detail</button>
-                    <button onclick="editAccount('${acc._id}')" class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded text-xs">Edit</button>
-                    <button onclick="deleteAccount('${acc._id}')" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs">Hapus</button>
+                    <button onclick="showDetail('${acc._id}')" class="btn-action btn-detail">Detail</button>
+                    <button onclick="editAccount('${acc._id}')" class="btn-action btn-edit">Edit</button>
+                    <button onclick="deleteAccount('${acc._id}')" class="btn-action btn-delete">Hapus</button>
                 </td>
             </tr>
         `;
@@ -170,15 +171,18 @@ function loadAmbilList() {
         list.innerHTML = '<p class="text-gray-500 p-4">Tidak ada akun tersedia</p>';
         return;
     }
-    list.innerHTML = available.map(a => `
-        <div class="flex items-center gap-3 p-2 border-b hover:bg-gray-50">
-            <input type="checkbox" class="ambil-checkbox" value="${a._id}" onchange="toggleAmbil('${a._id}')">
-            <span class="font-medium">${a.username}</span>
-            <span class="text-sm text-gray-500">${a.email || '-'}</span>
-            <span class="status-badge ${a.status === 'available' ? 'status-available' : 'status-3day'}">${a.status === 'available' ? 'Tersedia' : '3 Hari'}</span>
-            <span class="text-sm text-gray-400">${a.days || 0} hari</span>
-        </div>
-    `).join('');
+    list.innerHTML = available.map(a => {
+        const statusLabel = a.status === 'available' ? 'Tersedia' : '3 Hari';
+        return `
+            <div class="flex items-center gap-3 p-2 border-b hover:bg-gray-50">
+                <input type="checkbox" class="ambil-checkbox" value="${a._id}" onchange="toggleAmbil('${a._id}')">
+                <span class="font-medium">${a.username}</span>
+                <span class="text-sm text-gray-500">${a.email || '-'}</span>
+                <span class="status-badge status-gray">${statusLabel}</span>
+                <span class="text-sm text-gray-400">${Math.floor((Date.now() - new Date(a.created_at)) / (1000 * 60 * 60 * 24))} hari</span>
+            </div>
+        `;
+    }).join('');
     window.ambilSelected = new Set();
 }
 
@@ -233,14 +237,19 @@ function loadStatusList() {
         list.innerHTML = '<p class="text-gray-500 p-4">Belum ada akun</p>';
         return;
     }
-    list.innerHTML = allAccounts.map(a => `
-        <div class="flex items-center gap-3 p-2 border-b hover:bg-gray-50">
-            <input type="checkbox" class="status-checkbox" value="${a._id}" onchange="toggleStatus('${a._id}')">
-            <span class="font-medium">${a.username}</span>
-            <span class="text-sm text-gray-500">${a.email || '-'}</span>
-            <span class="status-badge ${a.status === 'available' || a.status === 'available_3d' ? 'status-available' : a.status === 'sold' ? 'status-sold' : 'status-personal'}">${a.status}</span>
-        </div>
-    `).join('');
+    list.innerHTML = allAccounts.map(a => {
+        const statusLabel = a.status === 'available' ? 'Tersedia' :
+                           a.status === 'available_3d' ? '3 Hari' :
+                           a.status === 'sold' ? 'Terjual' : 'Pribadi';
+        return `
+            <div class="flex items-center gap-3 p-2 border-b hover:bg-gray-50">
+                <input type="checkbox" class="status-checkbox" value="${a._id}" onchange="toggleStatus('${a._id}')">
+                <span class="font-medium">${a.username}</span>
+                <span class="text-sm text-gray-500">${a.email || '-'}</span>
+                <span class="status-badge status-gray">${statusLabel}</span>
+            </div>
+        `;
+    }).join('');
     window.statusSelected = new Set();
 }
 
@@ -276,6 +285,11 @@ async function updateBulkStatus(status) {
 function showDetail(id) {
     const acc = allAccounts.find(a => a._id === id);
     if (!acc) return;
+    
+    const statusLabel = acc.status === 'available' ? 'Tersedia' :
+                       acc.status === 'available_3d' ? '3 Hari' :
+                       acc.status === 'sold' ? 'Terjual' : 'Pribadi';
+    
     document.getElementById('modalTitle').textContent = `Detail - ${acc.username}`;
     document.getElementById('modalBody').innerHTML = `
         <div class="space-y-2">
@@ -284,8 +298,8 @@ function showDetail(id) {
             <p><strong>Email:</strong> ${acc.email || '-'}</p>
             <p><strong>Password:</strong> <code class="bg-gray-100 px-2 py-1 rounded">${acc.password}</code></p>
             <p><strong>TOTP:</strong> ${acc.totp || '-'}</p>
-            <p><strong>Status:</strong> ${acc.status}</p>
-            <p><strong>Umur:</strong> ${acc.days || 0} hari</p>
+            <p><strong>Status:</strong> <span class="status-badge status-gray">${statusLabel}</span></p>
+            <p><strong>Umur:</strong> ${Math.floor((Date.now() - new Date(acc.created_at)) / (1000 * 60 * 60 * 24))} hari</p>
             <p><strong>Ditambahkan:</strong> ${new Date(acc.created_at).toLocaleString('id-ID')}</p>
         </div>
     `;
@@ -330,7 +344,9 @@ async function deleteAccount(id) {
     const acc = allAccounts.find(a => a._id === id);
     if (!acc || !confirm(`Hapus "${acc.username}"?`)) return;
     try {
-        const response = await fetch(`${API_URL}/accounts/${id}`, { method: 'DELETE' });
+        const response = await fetch(`${API_URL}/accounts/${id}`, {
+            method: 'DELETE'
+        });
         if (!response.ok) throw new Error('Gagal hapus');
         showNotification('✅ Akun dihapus!', 'success');
         loadData();
