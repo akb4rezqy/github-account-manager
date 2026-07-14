@@ -3,149 +3,135 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GitHub Stock Manager</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Stock Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
 </head>
-<body>
-    <div class="container">
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-6 max-w-7xl">
+        
         <!-- Header -->
-        <header>
-            <div class="header-content">
-                <h1><i class="fab fa-github"></i> Stock Manager</h1>
-                <div class="header-actions">
-                    <button onclick="refreshData()" class="btn-refresh">
-                        <i class="fas fa-sync"></i> Refresh
-                    </button>
+        <header class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-lg p-6 mb-6">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <i class="fab fa-github text-3xl text-white"></i>
+                    <h1 class="text-2xl font-bold text-white">Stock Manager</h1>
                 </div>
+                <button onclick="refreshData()" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-all flex items-center gap-2">
+                    <i class="fas fa-sync"></i> Refresh
+                </button>
             </div>
         </header>
 
         <!-- Statistics -->
-        <div class="stats-grid">
-            <div class="stat-card total">
-                <div class="stat-icon"><i class="fas fa-database"></i></div>
-                <div class="stat-info">
-                    <h3>Total Akun</h3>
-                    <p id="total">0</p>
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            <div class="bg-white rounded-xl shadow p-4 hover:shadow-lg transition">
+                <div class="flex items-center gap-3">
+                    <div class="bg-indigo-100 p-3 rounded-full"><i class="fas fa-database text-indigo-600 text-xl"></i></div>
+                    <div><p class="text-gray-500 text-sm">Total</p><p id="total" class="text-2xl font-bold">0</p></div>
                 </div>
             </div>
-            <div class="stat-card available">
-                <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
-                <div class="stat-info">
-                    <h3>Tersedia &lt;3d</h3>
-                    <p id="available_3d">0</p>
+            <div class="bg-white rounded-xl shadow p-4 hover:shadow-lg transition">
+                <div class="flex items-center gap-3">
+                    <div class="bg-green-100 p-3 rounded-full"><i class="fas fa-check-circle text-green-600 text-xl"></i></div>
+                    <div><p class="text-gray-500 text-sm">&lt;3 hari</p><p id="available_3d" class="text-2xl font-bold">0</p></div>
                 </div>
             </div>
-            <div class="stat-card available-old">
-                <div class="stat-icon"><i class="fas fa-clock"></i></div>
-                <div class="stat-info">
-                    <h3>Tersedia &gt;3d</h3>
-                    <p id="available_7d">0</p>
+            <div class="bg-white rounded-xl shadow p-4 hover:shadow-lg transition">
+                <div class="flex items-center gap-3">
+                    <div class="bg-yellow-100 p-3 rounded-full"><i class="fas fa-clock text-yellow-600 text-xl"></i></div>
+                    <div><p class="text-gray-500 text-sm">&gt;3 hari</p><p id="available_7d" class="text-2xl font-bold">0</p></div>
                 </div>
             </div>
-            <div class="stat-card sold">
-                <div class="stat-icon"><i class="fas fa-money-bill-wave"></i></div>
-                <div class="stat-info">
-                    <h3>Terjual</h3>
-                    <p id="sold">0</p>
+            <div class="bg-white rounded-xl shadow p-4 hover:shadow-lg transition">
+                <div class="flex items-center gap-3">
+                    <div class="bg-red-100 p-3 rounded-full"><i class="fas fa-money-bill-wave text-red-600 text-xl"></i></div>
+                    <div><p class="text-gray-500 text-sm">Terjual</p><p id="sold" class="text-2xl font-bold">0</p></div>
                 </div>
             </div>
-            <div class="stat-card personal">
-                <div class="stat-icon"><i class="fas fa-user"></i></div>
-                <div class="stat-info">
-                    <h3>Pribadi</h3>
-                    <p id="personal">0</p>
+            <div class="bg-white rounded-xl shadow p-4 hover:shadow-lg transition">
+                <div class="flex items-center gap-3">
+                    <div class="bg-blue-100 p-3 rounded-full"><i class="fas fa-user text-blue-600 text-xl"></i></div>
+                    <div><p class="text-gray-500 text-sm">Pribadi</p><p id="personal" class="text-2xl font-bold">0</p></div>
                 </div>
             </div>
         </div>
 
-        <!-- Actions -->
-        <div class="actions">
-            <button onclick="showAddForm()" class="btn-add">
+        <!-- Action Buttons -->
+        <div class="flex flex-wrap gap-3 mb-6">
+            <button onclick="toggleForm('add')" class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 shadow">
                 <i class="fas fa-plus"></i> Tambah Akun
             </button>
-            <button onclick="showBulkAdd()" class="btn-bulk">
+            <button onclick="toggleForm('bulk')" class="bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 shadow">
                 <i class="fas fa-layer-group"></i> Bulk Add
             </button>
-            <button onclick="showAmbilForm()" class="btn-ambil">
+            <button onclick="toggleForm('ambil')" class="bg-pink-500 hover:bg-pink-600 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 shadow">
                 <i class="fas fa-download"></i> Ambil Akun
             </button>
-            <button onclick="showBulkStatus()" class="btn-status">
+            <button onclick="toggleForm('status')" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 shadow">
                 <i class="fas fa-edit"></i> Ubah Status
             </button>
         </div>
 
         <!-- Form Tambah Akun -->
-        <div id="addForm" class="form-container hidden">
-            <h3><i class="fas fa-plus-circle"></i> Tambah Akun</h3>
-            <form id="addAccountForm">
-                <input type="email" id="email" placeholder="Email (opsional)">
-                <input type="text" id="username" placeholder="Username *" required>
-                <input type="text" id="password" placeholder="Password *" required>
-                <input type="text" id="totp" placeholder="TOTP (opsional)">
-                <button type="submit" class="btn-submit">
-                    <i class="fas fa-save"></i> Simpan
-                </button>
-                <button type="button" onclick="hideAddForm()" class="btn-cancel">Batal</button>
+        <div id="addForm" class="hidden bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h3 class="text-xl font-bold mb-4"><i class="fas fa-plus-circle text-green-500"></i> Tambah Akun</h3>
+            <form id="addAccountForm" class="space-y-4">
+                <input type="email" id="email" placeholder="Email (opsional)" class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500">
+                <input type="text" id="username" placeholder="Username *" required class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500">
+                <input type="text" id="password" placeholder="Password *" required class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500">
+                <input type="text" id="totp" placeholder="TOTP (opsional)" class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500">
+                <div class="flex gap-3">
+                    <button type="submit" class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg font-semibold transition">Simpan</button>
+                    <button type="button" onclick="toggleForm('add')" class="bg-gray-300 hover:bg-gray-400 px-6 py-2 rounded-lg font-semibold transition">Batal</button>
+                </div>
             </form>
         </div>
 
         <!-- Form Bulk Add -->
-        <div id="bulkForm" class="form-container hidden">
-            <h3><i class="fas fa-layer-group"></i> Bulk Tambah Akun</h3>
-            <p class="form-hint">Format: email:username:password:totp (satu per baris)</p>
-            <p class="form-hint">Contoh: user@gmail.com:github_user:Pass123:123456</p>
-            <textarea id="bulkData" rows="8" placeholder="user1@gmail.com:user1:Pass123:123456&#10;user2@gmail.com:user2:Pass456:789012"></textarea>
-            <button onclick="submitBulk()" class="btn-submit">
-                <i class="fas fa-upload"></i> Tambahkan Semua
-            </button>
-            <button type="button" onclick="hideBulkForm()" class="btn-cancel">Batal</button>
+        <div id="bulkForm" class="hidden bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h3 class="text-xl font-bold mb-4"><i class="fas fa-layer-group text-indigo-500"></i> Bulk Tambah Akun</h3>
+            <p class="text-sm text-gray-500 mb-2">Format: email:username:password:totp (satu per baris)</p>
+            <textarea id="bulkData" rows="8" class="w-full px-4 py-3 border rounded-lg font-mono focus:ring-2 focus:ring-indigo-500" placeholder="user1@gmail.com:user1:Pass123:123456"></textarea>
+            <div class="flex gap-3 mt-4">
+                <button onclick="submitBulk()" class="bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-2 rounded-lg font-semibold transition">Tambahkan Semua</button>
+                <button onclick="toggleForm('bulk')" class="bg-gray-300 hover:bg-gray-400 px-6 py-2 rounded-lg font-semibold transition">Batal</button>
+            </div>
         </div>
 
         <!-- Form Ambil Akun -->
-        <div id="ambilForm" class="form-container hidden">
-            <h3><i class="fas fa-download"></i> Ambil Akun</h3>
-            <p class="form-hint">Pilih akun yang ingin diambil (status Tersedia atau 3 Hari)</p>
-            <p class="form-hint">⚠️ Setelah diambil, status akan otomatis berubah menjadi <strong>Terjual</strong></p>
-            <div id="ambilAccountList"></div>
-            <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
-                <button onclick="ambilAkun()" class="btn-ambil-submit">
-                    <i class="fas fa-download"></i> Ambil Akun
-                </button>
-                <button onclick="hideAmbilForm()" class="btn-cancel">Tutup</button>
+        <div id="ambilForm" class="hidden bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h3 class="text-xl font-bold mb-4"><i class="fas fa-download text-pink-500"></i> Ambil Akun</h3>
+            <p class="text-sm text-gray-500 mb-2">Pilih akun yang ingin diambil (status Tersedia atau 3 Hari)</p>
+            <div id="ambilAccountList" class="max-h-60 overflow-y-auto border rounded-lg p-2"></div>
+            <div class="flex gap-3 mt-4">
+                <button onclick="ambilAkun()" class="bg-pink-500 hover:bg-pink-600 text-white px-6 py-2 rounded-lg font-semibold transition"><i class="fas fa-download"></i> Ambil Akun</button>
+                <button onclick="toggleForm('ambil')" class="bg-gray-300 hover:bg-gray-400 px-6 py-2 rounded-lg font-semibold transition">Tutup</button>
             </div>
         </div>
 
         <!-- Form Ubah Status -->
-        <div id="statusForm" class="form-container hidden">
-            <h3><i class="fas fa-edit"></i> Ubah Status</h3>
-            <p class="form-hint">Pilih akun yang ingin diubah statusnya</p>
-            <div id="statusAccountList"></div>
-            <div class="status-actions">
-                <button onclick="updateBulkStatus('available')" class="btn-status-available">
-                    <i class="fas fa-undo"></i> Tersedia
-                </button>
-                <button onclick="updateBulkStatus('available_3d')" class="btn-status-3day">
-                    <i class="fas fa-clock"></i> 3 Hari
-                </button>
-                <button onclick="updateBulkStatus('sold')" class="btn-status-sold">
-                    <i class="fas fa-money-bill-wave"></i> Terjual
-                </button>
-                <button onclick="updateBulkStatus('personal')" class="btn-status-personal">
-                    <i class="fas fa-user"></i> Pribadi
-                </button>
+        <div id="statusForm" class="hidden bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h3 class="text-xl font-bold mb-4"><i class="fas fa-edit text-blue-500"></i> Ubah Status</h3>
+            <p class="text-sm text-gray-500 mb-2">Pilih akun yang ingin diubah statusnya</p>
+            <div id="statusAccountList" class="max-h-60 overflow-y-auto border rounded-lg p-2"></div>
+            <div class="flex flex-wrap gap-3 mt-4">
+                <button onclick="updateBulkStatus('available')" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold transition">Tersedia</button>
+                <button onclick="updateBulkStatus('available_3d')" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-semibold transition">3 Hari</button>
+                <button onclick="updateBulkStatus('sold')" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold transition">Terjual</button>
+                <button onclick="updateBulkStatus('personal')" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold transition">Pribadi</button>
+                <button onclick="toggleForm('status')" class="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-lg font-semibold transition">Tutup</button>
             </div>
-            <button type="button" onclick="hideStatusForm()" class="btn-cancel" style="margin-top: 10px;">Tutup</button>
         </div>
 
         <!-- Account List -->
-        <div class="account-list">
-            <div class="list-header">
-                <h3><i class="fas fa-list"></i> Daftar Akun</h3>
-                <div class="list-controls">
-                    <input type="text" id="searchInput" placeholder="Cari akun..." onkeyup="filterAccounts()">
-                    <select id="statusFilter" onchange="filterAccounts()">
+        <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+            <div class="p-4 border-b flex flex-wrap justify-between items-center gap-3">
+                <h3 class="text-xl font-bold"><i class="fas fa-list"></i> Daftar Akun</h3>
+                <div class="flex gap-2 flex-wrap">
+                    <input type="text" id="searchInput" placeholder="Cari akun..." class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500" onkeyup="filterAccounts()">
+                    <select id="statusFilter" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500" onchange="filterAccounts()">
                         <option value="all">Semua Status</option>
                         <option value="available">Tersedia</option>
                         <option value="available_3d">3 Hari</option>
@@ -154,37 +140,33 @@
                     </select>
                 </div>
             </div>
-            <div id="accountTableContainer">
-                <table>
-                    <thead>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50">
                         <tr>
-                            <th><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
-                            <th>ID</th>
-                            <th>Username</th>
-                            <th>Email</th>
-                            <th>Umur</th>
-                            <th>Tanggal</th>
-                            <th>Status</th>
-                            <th>Aksi</th>
+                            <th class="px-4 py-3 text-left"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold">ID</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold">Username</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold">Email</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold">Umur</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold">Tanggal</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold">Status</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold">Aksi</th>
                         </tr>
                     </thead>
-                    <tbody id="accountTableBody">
-                        <!-- Data akan diisi oleh JavaScript -->
-                    </tbody>
+                    <tbody id="accountTableBody"></tbody>
                 </table>
             </div>
         </div>
     </div>
 
-    <!-- Modal untuk detail akun -->
-    <div id="accountModal" class="modal hidden" onclick="closeModalOutside(event)">
-        <div class="modal-content">
-            <span class="close" onclick="closeModal()">&times;</span>
-            <h2 id="modalTitle">Detail Akun</h2>
+    <!-- Modal -->
+    <div id="accountModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick="closeModalOutside(event)">
+        <div class="bg-white rounded-2xl max-w-md w-full mx-4 p-6 relative">
+            <button onclick="closeModal()" class="absolute right-4 top-4 text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            <h2 id="modalTitle" class="text-2xl font-bold mb-4">Detail Akun</h2>
             <div id="modalBody"></div>
-            <button onclick="closeModal()" class="btn-close-modal">
-                <i class="fas fa-times"></i> Tutup
-            </button>
+            <button onclick="closeModal()" class="w-full mt-4 bg-indigo-500 hover:bg-indigo-600 text-white py-3 rounded-lg font-semibold transition">Tutup</button>
         </div>
     </div>
 
