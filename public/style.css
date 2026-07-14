@@ -1,54 +1,4 @@
-/* Animasi */
-@keyframes slideDown {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-#addForm, #bulkForm, #ambilForm, #statusForm {
-    animation: slideDown 0.3s ease;
-}
-
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
-::-webkit-scrollbar-thumb { background: #888; border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: #555; }
-
-/* Badge Status */
-.status-badge {
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 600;
-    display: inline-block;
-}
-.status-available { background: #d4edda; color: #155724; }
-.status-3day { background: #fff3cd; color: #856404; }
-.status-sold { background: #f8d7da; color: #721c24; }
-.status-personal { background: #d1ecf1; color: #0c5460; }
-
-/* Notification */
-.notification {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    padding: 15px 25px;
-    border-radius: 10px;
-    color: white;
-    font-weight: 600;
-    z-index: 9999;
-    max-width: 400px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    animation: slideIn 0.3s ease;
-}
-.notification.success { background: #10b981; }
-.notification.error { background: #ef4444; }
-.notification.info { background: #3b82f6; }
-
-@keyframes slideIn {
-    from { transform: translateX(100px); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
-}
+/* Reset & Base */
 * {
     margin: 0;
     padding: 0;
@@ -57,8 +7,8 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-    background: #f0f2f5;
-    color: #333;
+    background: #f5f5f5;
+    color: #1a1a1a;
     min-height: 100vh;
 }
 
@@ -68,14 +18,14 @@ body {
     padding: 20px;
 }
 
-/* Header */
+/* Header - Hitam */
 header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #1a1a1a;
     color: white;
     padding: 20px 30px;
-    border-radius: 15px;
+    border-radius: 12px;
     margin-bottom: 30px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 
 .header-content {
@@ -92,8 +42,8 @@ header h1 {
 }
 
 .btn-refresh {
-    background: rgba(255,255,255,0.2);
-    border: none;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.2);
     color: white;
     padding: 10px 20px;
     border-radius: 8px;
@@ -103,11 +53,10 @@ header h1 {
 }
 
 .btn-refresh:hover {
-    background: rgba(255,255,255,0.3);
-    transform: scale(1.05);
+    background: rgba(255,255,255,0.25);
 }
 
-/* Statistics */
+/* Statistics Cards - Abu-abu */
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -119,48 +68,51 @@ header h1 {
     background: white;
     padding: 20px;
     border-radius: 12px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
     display: flex;
     align-items: center;
     gap: 15px;
-    transition: transform 0.2s;
+    transition: box-shadow 0.2s;
+    border: 1px solid #e8e8e8;
 }
 
 .stat-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
 }
 
 .stat-icon {
-    font-size: 30px;
-    width: 60px;
-    height: 60px;
+    font-size: 24px;
+    width: 50px;
+    height: 50px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     color: white;
+    flex-shrink: 0;
 }
 
-.stat-card.total .stat-icon { background: linear-gradient(135deg, #667eea, #764ba2); }
-.stat-card.available .stat-icon { background: linear-gradient(135deg, #00b09b, #96c93d); }
-.stat-card.available-old .stat-icon { background: linear-gradient(135deg, #f2994a, #f2c94a); }
-.stat-card.sold .stat-icon { background: linear-gradient(135deg, #f093fb, #f5576c); }
-.stat-card.personal .stat-icon { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+/* Semua icon pake abu-abu */
+.stat-card.total .stat-icon { background: #4a4a4a; }
+.stat-card.available .stat-icon { background: #3a3a3a; }
+.stat-card.available-old .stat-icon { background: #5a5a5a; }
+.stat-card.sold .stat-icon { background: #2a2a2a; }
+.stat-card.personal .stat-icon { background: #6a6a6a; }
 
 .stat-info h3 {
     font-size: 14px;
-    color: #888;
+    color: #777;
     margin-bottom: 5px;
+    font-weight: 500;
 }
 
 .stat-info p {
     font-size: 28px;
-    font-weight: bold;
-    color: #333;
+    font-weight: 700;
+    color: #1a1a1a;
 }
 
-/* Actions */
+/* Action Buttons - Hitam Putih */
 .actions {
     display: flex;
     gap: 10px;
@@ -182,54 +134,65 @@ header h1 {
 }
 
 .btn-add {
-    background: linear-gradient(135deg, #00b09b, #96c93d);
+    background: #1a1a1a;
     color: white;
+}
+
+.btn-add:hover {
+    background: #333;
+    transform: scale(1.02);
 }
 
 .btn-bulk {
-    background: linear-gradient(135deg, #667eea, #764ba2);
+    background: #333;
     color: white;
+}
+
+.btn-bulk:hover {
+    background: #4a4a4a;
+    transform: scale(1.02);
 }
 
 .btn-ambil {
-    background: linear-gradient(135deg, #f093fb, #f5576c);
+    background: #4a4a4a;
     color: white;
+}
+
+.btn-ambil:hover {
+    background: #5a5a5a;
+    transform: scale(1.02);
 }
 
 .btn-status {
-    background: linear-gradient(135deg, #4facfe, #00f2fe);
+    background: #666;
     color: white;
 }
 
-.actions button:hover {
-    transform: scale(1.05);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+.btn-status:hover {
+    background: #777;
+    transform: scale(1.02);
 }
 
-/* Forms */
+/* Forms - Putih */
 .form-container {
     background: white;
     padding: 30px;
     border-radius: 12px;
     margin-bottom: 30px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    border: 1px solid #e8e8e8;
     animation: slideDown 0.3s ease;
 }
 
 @keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .form-container h3 {
     margin-bottom: 20px;
-    color: #333;
+    color: #1a1a1a;
+    font-weight: 700;
 }
 
 .form-container input,
@@ -237,16 +200,19 @@ header h1 {
     width: 100%;
     padding: 12px;
     margin-bottom: 12px;
-    border: 1px solid #ddd;
+    border: 1px solid #d0d0d0;
     border-radius: 8px;
     font-size: 14px;
     transition: border-color 0.3s;
+    background: #fafafa;
+    color: #1a1a1a;
 }
 
 .form-container input:focus,
 .form-container textarea:focus {
     outline: none;
-    border-color: #667eea;
+    border-color: #555;
+    background: white;
 }
 
 .form-container textarea {
@@ -265,7 +231,7 @@ header h1 {
 }
 
 .btn-submit {
-    background: linear-gradient(135deg, #00b09b, #96c93d);
+    background: #1a1a1a;
     color: white;
     padding: 12px 30px;
     border: none;
@@ -277,11 +243,12 @@ header h1 {
 }
 
 .btn-submit:hover {
-    transform: scale(1.05);
+    background: #333;
+    transform: scale(1.02);
 }
 
 .btn-cancel {
-    background: #e0e0e0;
+    background: #e8e8e8;
     color: #333;
     padding: 12px 30px;
     border: none;
@@ -302,7 +269,8 @@ header h1 {
     background: white;
     border-radius: 12px;
     padding: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    border: 1px solid #e8e8e8;
 }
 
 .list-header {
@@ -315,7 +283,8 @@ header h1 {
 }
 
 .list-header h3 {
-    color: #333;
+    color: #1a1a1a;
+    font-weight: 700;
 }
 
 .list-controls {
@@ -327,9 +296,17 @@ header h1 {
 .list-controls input,
 .list-controls select {
     padding: 8px 12px;
-    border: 1px solid #ddd;
+    border: 1px solid #d0d0d0;
     border-radius: 6px;
     font-size: 14px;
+    background: #fafafa;
+    color: #1a1a1a;
+}
+
+.list-controls input:focus,
+.list-controls select:focus {
+    outline: none;
+    border-color: #555;
 }
 
 #accountTableContainer {
@@ -342,25 +319,26 @@ table {
 }
 
 th {
-    background: #f8f9fa;
+    background: #f0f0f0;
     padding: 12px;
     text-align: left;
     font-weight: 600;
-    color: #555;
-    border-bottom: 2px solid #e0e0e0;
+    color: #333;
+    border-bottom: 2px solid #d0d0d0;
     white-space: nowrap;
 }
 
 td {
     padding: 12px;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid #ebebeb;
     vertical-align: middle;
 }
 
 tr:hover {
-    background: #f8f9fa;
+    background: #f7f7f7;
 }
 
+/* Status Badges - Hitam Putih */
 .status-badge {
     padding: 4px 12px;
     border-radius: 20px;
@@ -371,25 +349,26 @@ tr:hover {
 }
 
 .status-available {
-    background: #d4edda;
-    color: #155724;
+    background: #d4d4d4;
+    color: #1a1a1a;
 }
 
 .status-3day {
-    background: #fff3cd;
-    color: #856404;
+    background: #b0b0b0;
+    color: #1a1a1a;
 }
 
 .status-sold {
-    background: #f8d7da;
-    color: #721c24;
+    background: #888;
+    color: white;
 }
 
 .status-personal {
-    background: #d1ecf1;
-    color: #0c5460;
+    background: #e0e0e0;
+    color: #1a1a1a;
 }
 
+/* Action Buttons di Tabel - Hitam Putih */
 .btn-action {
     padding: 6px 10px;
     border: none;
@@ -401,25 +380,37 @@ tr:hover {
 }
 
 .btn-action:hover {
-    transform: scale(1.1);
+    transform: scale(1.05);
 }
 
 .btn-detail {
-    background: #667eea;
+    background: #4a4a4a;
     color: white;
+}
+
+.btn-detail:hover {
+    background: #333;
 }
 
 .btn-edit {
-    background: #f2994a;
+    background: #888;
     color: white;
+}
+
+.btn-edit:hover {
+    background: #666;
 }
 
 .btn-delete {
-    background: #f5576c;
+    background: #2a2a2a;
     color: white;
 }
 
-/* Modal */
+.btn-delete:hover {
+    background: #1a1a1a;
+}
+
+/* Modal - Hitam Putih */
 .modal {
     position: fixed;
     z-index: 1000;
@@ -427,7 +418,7 @@ tr:hover {
     top: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0,0,0,0.6);
+    background: rgba(0,0,0,0.5);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -461,12 +452,12 @@ tr:hover {
     position: absolute;
     right: 20px;
     top: 15px;
-    font-size: 32px;
+    font-size: 28px;
     cursor: pointer;
-    color: #888;
+    color: #999;
     transition: all 0.3s;
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -476,13 +467,12 @@ tr:hover {
 }
 
 .close:hover {
-    color: #333;
+    color: #1a1a1a;
     background: #e0e0e0;
-    transform: rotate(90deg);
 }
 
 .btn-close-modal {
-    background: linear-gradient(135deg, #667eea, #764ba2);
+    background: #1a1a1a;
     color: white;
     padding: 12px 30px;
     border: none;
@@ -496,11 +486,10 @@ tr:hover {
 }
 
 .btn-close-modal:hover {
-    transform: scale(1.02);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    background: #333;
 }
 
-/* Status Actions */
+/* Status Actions - Hitam Putih */
 .status-actions {
     display: flex;
     gap: 10px;
@@ -519,29 +508,44 @@ tr:hover {
 }
 
 .status-actions button:hover {
-    transform: scale(1.05);
+    transform: scale(1.02);
 }
 
 .btn-status-available {
-    background: #00b09b;
+    background: #555;
+}
+
+.btn-status-available:hover {
+    background: #444;
 }
 
 .btn-status-3day {
-    background: #f2c94a;
-    color: #333;
+    background: #777;
+}
+
+.btn-status-3day:hover {
+    background: #666;
 }
 
 .btn-status-sold {
-    background: #f5576c;
+    background: #333;
+}
+
+.btn-status-sold:hover {
+    background: #222;
 }
 
 .btn-status-personal {
-    background: #4facfe;
+    background: #999;
+}
+
+.btn-status-personal:hover {
+    background: #888;
 }
 
 /* Ambil Form */
 .btn-ambil-submit {
-    background: linear-gradient(135deg, #f093fb, #f5576c);
+    background: #1a1a1a;
     color: white;
     padding: 12px 30px;
     border: none;
@@ -553,10 +557,11 @@ tr:hover {
 }
 
 .btn-ambil-submit:hover {
-    transform: scale(1.05);
+    background: #333;
+    transform: scale(1.02);
 }
 
-/* Notification */
+/* Notification - Hitam Putih */
 .notification {
     position: fixed;
     top: 20px;
@@ -565,7 +570,7 @@ tr:hover {
     border-radius: 10px;
     color: white;
     font-weight: 600;
-    z-index: 2000;
+    z-index: 9999;
     max-width: 400px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.2);
     display: flex;
@@ -574,9 +579,9 @@ tr:hover {
     animation: slideInRight 0.3s;
 }
 
-.notification.success { background: linear-gradient(135deg, #00b09b, #96c93d); }
-.notification.error { background: linear-gradient(135deg, #f093fb, #f5576c); }
-.notification.info { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+.notification.success { background: #2a2a2a; }
+.notification.error { background: #1a1a1a; }
+.notification.info { background: #4a4a4a; }
 
 @keyframes slideInRight {
     from { transform: translateX(100px); opacity: 0; }
@@ -588,27 +593,27 @@ input[type="checkbox"] {
     width: 18px;
     height: 18px;
     cursor: pointer;
-    accent-color: #667eea;
+    accent-color: #1a1a1a;
 }
 
-/* Scrollbar styling */
+/* Scrollbar - Hitam Putih */
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-    background: #f1f1f1;
+    background: #f0f0f0;
     border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #888;
+    background: #aaa;
     border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #555;
+    background: #888;
 }
 
 /* Responsive */
@@ -689,9 +694,9 @@ input[type="checkbox"] {
     }
 
     .stat-icon {
-        width: 45px;
-        height: 45px;
-        font-size: 22px;
+        width: 40px;
+        height: 40px;
+        font-size: 18px;
     }
 
     .form-container {
