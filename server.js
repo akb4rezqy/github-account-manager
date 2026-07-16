@@ -28,38 +28,38 @@ app.use(helmet({
 
 // ============ RATE LIMITING ============
 const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // 5 attempts
+    windowMs: 15 * 60 * 1000,
+    max: 5,
     message: { error: 'Terlalu banyak percobaan login. Coba lagi setelah 15 menit.' },
     standardHeaders: true,
     legacyHeaders: false,
 });
 
 const apiLimiter = rateLimit({
-    windowMs: 60 * 1000, // 1 minute
-    max: 100, // 100 requests
+    windowMs: 60 * 1000,
+    max: 100,
     message: { error: 'Terlalu banyak request. Coba lagi nanti.' },
 });
 
-// ============ SESSION ============
+// ============ SESSION - PERBAIKAN ============
 app.use(session({
     secret: process.env.SESSION_SECRET || 'your-secret-key-min-32-chars',
     resave: false,
-    saveUninitialized: false,
+    saveUninitialized: true, // ✅ UBAH ke true
     cookie: {
-        secure: process.env.NODE_ENV === 'production',
+        secure: false, // ✅ SET false untuk localhost (http)
         httpOnly: true,
-        sameSite: 'lax',
-        maxAge: 24 * 60 * 60 * 1000
+        sameSite: 'lax', // ✅ UBAH ke 'lax'
+        maxAge: 24 * 60 * 60 * 1000,
+        path: '/' // ✅ TAMBAHKAN path
     },
-    name: 'sessionId'
+    name: 'sessionId',
+    rolling: true // ✅ TAMBAHKAN - refresh session tiap request
 }));
 
 // ============ MIDDLEWARE ============
 app.use(cors({
-    origin: process.env.NODE_ENV === 'production' 
-        ? ['https://your-domain.com'] 
-        : ['http://localhost:3000', 'http://localhost:5173'],
+    origin: ['http://localhost:3000', 'http://localhost:5173'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
@@ -69,15 +69,23 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Apply rate limiting ke semua API
+// ✅ TAMBAHKAN LOG SESSION
+app.use((req, res, next) => {
+    console.log('📝 Session ID:', req.sessionID);
+    console.log('📝 Session User:', req.session.user);
+    next();
+});
+
 app.use('/api/', apiLimiter);
 
 // ============ AUTH MIDDLEWARE ============
 function isAuthenticated(req, res, next) {
+    console.log('🔍 Checking auth... Session user:', req.session.user);
     if (req.session.user) {
         return next();
     }
     if (!req.path.startsWith('/api/')) {
+        console.log('❌ Not authenticated, redirecting to login');
         return res.redirect('/login.html');
     }
     res.status(401).json({ error: 'Unauthorized' });
@@ -85,7 +93,6 @@ function isAuthenticated(req, res, next) {
 
 // ============ ROUTES ============
 
-// Login page
 app.get('/login.html', (req, res) => {
     if (req.session.user) {
         return res.redirect('/');
@@ -93,7 +100,7 @@ app.get('/login.html', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-// Login API - dengan rate limiting + validation
+// Login API
 app.post('/api/login', loginLimiter, [
     body('username').trim().isLength({ min: 3, max: 50 }).escape(),
     body('password').trim().isLength({ min: 3, max: 100 }).escape()
@@ -108,29 +115,24 @@ app.post('/api/login', loginLimiter, [
         const validUsername = process.env.ADMIN_USERNAME || 'admin';
         const validPasswordHash = process.env.ADMIN_PASSWORD_HASH;
 
-        // DEBUG LOG
         console.log('🔍 Login attempt:', { username });
-        console.log('🔍 Hash from env:', validPasswordHash ? '✅ ADA' : '❌ TIDAK ADA');
 
         if (!validPasswordHash) {
             console.error('❌ ADMIN_PASSWORD_HASH not set in .env');
-            return res.status(500).json({ error: 'Server configuration error - Password hash not set' });
+            return res.status(500).json({ error: 'Server configuration error' });
         }
 
-        // Check username
         if (username !== validUsername) {
-            console.log('❌ Username salah:', username);
+            console.log('❌ Username salah');
             return res.status(401).json({ error: 'Username atau password salah' });
         }
 
-        // Check password dengan bcrypt
         let isValidPassword = false;
         try {
             isValidPassword = await bcrypt.compare(password, validPasswordHash);
-            console.log('🔍 Password valid:', isValidPassword);
         } catch (bcryptError) {
             console.error('❌ Bcrypt error:', bcryptError.message);
-            return res.status(500).json({ error: 'Server configuration error - Invalid hash format' });
+            return res.status(500).json({ error: 'Server configuration error' });
         }
 
         if (!isValidPassword) {
@@ -138,21 +140,21 @@ app.post('/api/login', loginLimiter, [
             return res.status(401).json({ error: 'Username atau password salah' });
         }
 
-        // ✅ LOGIN BERHASIL
-        console.log('✅ Login successful for:', username);
-        req.session.regenerate((err) => {
+        // ✅ SIMPAN SESSION
+        req.session.user = { username, loginTime: Date.now() };
+        req.session.save((err) => {
             if (err) {
-                console.error('Session regenerate error:', err);
+                console.error('❌ Session save error:', err);
                 return res.status(500).json({ error: 'Server error' });
             }
-            req.session.user = { username, loginTime: Date.now() };
-            req.session.save();
+            console.log('✅ Session saved! User:', req.session.user);
+            console.log('✅ Session ID:', req.sessionID);
             res.json({ success: true, message: 'Login berhasil' });
         });
 
     } catch (error) {
         console.error('❌ Login error:', error);
-        res.status(500).json({ error: 'Terjadi kesalahan server: ' + error.message });
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
     }
 });
 
@@ -170,6 +172,8 @@ app.post('/api/logout', (req, res) => {
 
 // Check session
 app.get('/api/check-auth', (req, res) => {
+    console.log('🔍 Check-auth - Session user:', req.session.user);
+    console.log('🔍 Check-auth - Session ID:', req.sessionID);
     if (req.session.user) {
         res.json({ authenticated: true, user: { username: req.session.user.username } });
     } else {
@@ -228,7 +232,6 @@ app.get('/api/health', isAuthenticated, (req, res) => {
     });
 });
 
-// GET semua akun
 app.get('/api/accounts', async (req, res) => {
     try {
         const accounts = await Account.find().sort({ created_at: -1 });
@@ -239,7 +242,6 @@ app.get('/api/accounts', async (req, res) => {
     }
 });
 
-// GET statistik
 app.get('/api/statistics', async (req, res) => {
     try {
         const total = await Account.countDocuments();
@@ -261,7 +263,6 @@ app.get('/api/statistics', async (req, res) => {
     }
 });
 
-// POST tambah akun
 app.post('/api/accounts', [
     body('email').optional().isEmail().normalizeEmail(),
     body('username').trim().isLength({ min: 1, max: 100 }),
@@ -296,7 +297,6 @@ app.post('/api/accounts', [
     }
 });
 
-// POST bulk
 app.post('/api/accounts/bulk', async (req, res) => {
     try {
         const { accounts } = req.body;
@@ -304,7 +304,6 @@ app.post('/api/accounts/bulk', async (req, res) => {
             return res.status(400).json({ error: 'Data tidak valid' });
         }
 
-        // Limit bulk size
         if (accounts.length > 100) {
             return res.status(400).json({ error: 'Maksimal 100 akun per request' });
         }
@@ -334,7 +333,6 @@ app.post('/api/accounts/bulk', async (req, res) => {
     }
 });
 
-// PUT bulk status
 app.put('/api/accounts/bulk/status', async (req, res) => {
     try {
         const { ids, status } = req.body;
@@ -342,7 +340,6 @@ app.put('/api/accounts/bulk/status', async (req, res) => {
             return res.status(400).json({ error: 'ID tidak valid' });
         }
 
-        // Limit bulk size
         if (ids.length > 100) {
             return res.status(400).json({ error: 'Maksimal 100 ID per request' });
         }
@@ -366,7 +363,6 @@ app.put('/api/accounts/bulk/status', async (req, res) => {
     }
 });
 
-// PUT update account
 app.put('/api/accounts/:id', [
     body('email').optional().isEmail().normalizeEmail(),
     body('username').optional().trim().isLength({ min: 1, max: 100 }),
@@ -399,7 +395,6 @@ app.put('/api/accounts/:id', [
     }
 });
 
-// DELETE account
 app.delete('/api/accounts/:id', async (req, res) => {
     try {
         const account = await Account.findByIdAndDelete(req.params.id);
@@ -424,13 +419,10 @@ mongoose.connect(process.env.MONGODB_URI, {
         console.log('✅ Connected to MongoDB Atlas');
         console.log(`📊 Database: ${mongoose.connection.db.databaseName}`);
 
-        // Cek password hash
         if (!process.env.ADMIN_PASSWORD_HASH) {
             console.log('\n⚠️  PASSWORD HASH BELUM DISET!');
             console.log('Generate dengan: node -e "console.log(require(\'bcryptjs\').hashSync(\'rahasia123\', 10))"');
             console.log('Lalu tambahkan ke .env: ADMIN_PASSWORD_HASH=hasil_hash\n');
-        } else {
-            console.log('✅ Password hash ditemukan di .env');
         }
 
         app.listen(PORT, '0.0.0.0', () => {
@@ -441,7 +433,6 @@ mongoose.connect(process.env.MONGODB_URI, {
     })
     .catch(err => {
         console.error('❌ MongoDB connection error:', err);
-        console.log('\n⚠️  Server tetap berjalan tanpa database...');
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 Server running (without DB) on http://localhost:${PORT}`);
         });
