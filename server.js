@@ -1,466 +1,560 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const path = require('path');
-const session = require('express-session');
-const rateLimit = require('express-rate-limit');
-const helmet = require('helmet');
-const bcrypt = require('bcryptjs');
-const { body, validationResult } = require('express-validator');
-require('dotenv').config();
+const API_URL = window.location.origin + '/api';
+let allAccounts = [];
+let selectedAccounts = new Set();
 
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-// ============ SECURITY HEADERS ============
-app.use(helmet({
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com", "https://cdnjs.cloudflare.com"],
-            styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com", "https://cdnjs.cloudflare.com"],
-            fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
-            imgSrc: ["'self'", "data:"],
-        },
-    },
-    crossOriginEmbedderPolicy: false,
-}));
-
-// ============ RATE LIMITING ============
-const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 5,
-    message: { error: 'Terlalu banyak percobaan login. Coba lagi setelah 15 menit.' },
-    standardHeaders: true,
-    legacyHeaders: false,
-});
-
-const apiLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    max: 100,
-    message: { error: 'Terlalu banyak request. Coba lagi nanti.' },
-});
-
-// ============ CACHE CONTROL ============
-app.use((req, res, next) => {
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    next();
-});
-
-// ============ SESSION ============
-app.use(session({
-    secret: process.env.SESSION_SECRET || 'your-secret-key-min-32-chars',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-        secure: false,
-        httpOnly: true,
-        sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-        path: '/'
-    },
-    name: 'sessionId',
-    rolling: true
-}));
-
-// ============ MIDDLEWARE ============
-app.use(cors({
-    origin: ['http://localhost:3000', 'http://localhost:5173'],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
-}));
-
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
-
-// ============ LOG SESSION ============
-app.use((req, res, next) => {
-    console.log(`📝 [${new Date().toISOString()}] Session ID:`, req.sessionID);
-    console.log(`📝 [${new Date().toISOString()}] Session User:`, req.session.user);
-    next();
-});
-
-app.use('/api/', apiLimiter);
-
-// ============ AUTH MIDDLEWARE ============
-function isAuthenticated(req, res, next) {
-    console.log('🔍 Checking auth... Session user:', req.session.user);
-    if (req.session.user) {
-        return next();
+// ============ CHECK AUTH ============
+async function checkAuth() {
+    try {
+        console.log('🔍 Checking auth...');
+        const response = await fetch('/api/check-auth', {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache, no-store, must-revalidate'
+            }
+        });
+        
+        if (!response.ok) {
+            console.error('❌ Auth check failed:', response.status);
+            return { authenticated: false };
+        }
+        
+        const data = await response.json();
+        console.log('✅ Auth response:', data);
+        
+        if (!data.authenticated) {
+            console.log('🔒 Not authenticated, redirecting to login...');
+            window.location.href = '/login.html';
+            return { authenticated: false };
+        }
+        
+        if (data.user) {
+            const userDisplay = document.getElementById('userDisplay');
+            if (userDisplay) {
+                userDisplay.textContent = `👤 ${data.user.username}`;
+            }
+        }
+        
+        return data;
+    } catch (error) {
+        console.error('❌ Auth check error:', error);
+        window.location.href = '/login.html';
+        return { authenticated: false };
     }
-    if (!req.path.startsWith('/api/')) {
-        console.log('❌ Not authenticated, redirecting to login');
-        return res.redirect('/login.html');
-    }
-    res.status(401).json({ error: 'Unauthorized' });
 }
 
-// ============ ROUTES ============
-
-app.get('/login.html', (req, res) => {
-    if (req.session.user) {
-        return res.redirect('/');
-    }
-    res.sendFile(path.join(__dirname, 'public', 'login.html'));
-});
-
-// Login API
-app.post('/api/login', loginLimiter, [
-    body('username').trim().isLength({ min: 3, max: 50 }).escape(),
-    body('password').trim().isLength({ min: 3, max: 100 }).escape()
-], async (req, res) => {
+// ============ LOGOUT ============
+async function logout() {
+    if (!confirm('Yakin ingin logout?')) return;
     try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ error: 'Input tidak valid' });
+        const response = await fetch('/api/logout', { 
+            method: 'POST',
+            credentials: 'include'
+        });
+        if (response.ok) {
+            window.location.href = '/login.html';
         }
+    } catch (error) {
+        console.error('Logout failed:', error);
+        showNotification('❌ Gagal logout', 'error');
+    }
+}
 
-        const { username, password } = req.body;
-        const validUsername = process.env.ADMIN_USERNAME || 'admin';
-        const validPasswordHash = process.env.ADMIN_PASSWORD_HASH;
+// ============ LOAD DATA ============
+async function loadData() {
+    try {
+        console.log('📊 Loading data...');
+        
+        // ✅ Load sequential
+        await loadAccounts();
+        await loadStatistics();
+        
+        console.log('✅ All data loaded successfully');
+    } catch (error) {
+        console.error('Error loading data:', error);
+        showNotification('❌ Gagal memuat data: ' + error.message, 'error');
+    }
+}
 
-        console.log('🔍 Login attempt:', { username });
-
-        if (!validPasswordHash) {
-            console.error('❌ ADMIN_PASSWORD_HASH not set in .env');
-            return res.status(500).json({ error: 'Server configuration error' });
+async function loadAccounts() {
+    try {
+        console.log('📊 Loading accounts...');
+        const response = await fetch(`${API_URL}/accounts`, {
+            credentials: 'include',
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate'
+            }
+        });
+        
+        if (!response.ok) {
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
+            throw new Error('Failed to fetch accounts');
         }
+        
+        allAccounts = await response.json();
+        console.log(`✅ Loaded ${allAccounts.length} accounts`);
+        renderAccounts(allAccounts);
+    } catch (error) {
+        console.error('Error loading accounts:', error);
+        showNotification('❌ Gagal memuat akun', 'error');
+        renderAccounts([]);
+    }
+}
 
-        if (username !== validUsername) {
-            return res.status(401).json({ error: 'Username atau password salah' });
+async function loadStatistics() {
+    try {
+        console.log('📊 Loading statistics...');
+        const response = await fetch(`${API_URL}/statistics`, {
+            credentials: 'include'
+        });
+        
+        if (!response.ok) {
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
+            throw new Error('Failed to fetch statistics');
         }
-
-        let isValidPassword = false;
-        try {
-            isValidPassword = await bcrypt.compare(password, validPasswordHash);
-        } catch (bcryptError) {
-            console.error('❌ Bcrypt error:', bcryptError.message);
-            return res.status(500).json({ error: 'Server configuration error' });
-        }
-
-        if (!isValidPassword) {
-            return res.status(401).json({ error: 'Username atau password salah' });
-        }
-
-        req.session.user = { 
-            username: username, 
-            loginTime: Date.now() 
+        
+        const stats = await response.json();
+        console.log('✅ Statistics loaded:', stats);
+        
+        // ✅ Update dengan aman
+        const elements = {
+            total: document.getElementById('total'),
+            available_3d: document.getElementById('available_3d'),
+            available_7d: document.getElementById('available_7d'),
+            sold: document.getElementById('sold'),
+            personal: document.getElementById('personal')
         };
         
-        req.session.save((err) => {
-            if (err) {
-                console.error('❌ Session save error:', err);
-                return res.status(500).json({ error: 'Server error' });
-            }
-            
-            console.log('✅ Session saved!');
-            console.log('✅ Session ID:', req.sessionID);
-            console.log('✅ Session User:', req.session.user);
-            
-            res.cookie('sessionId', req.sessionID, {
-                httpOnly: true,
-                secure: false,
-                sameSite: 'lax',
-                maxAge: 7 * 24 * 60 * 60 * 1000,
-                path: '/'
-            });
-            
-            res.json({ 
-                success: true, 
-                message: 'Login berhasil'
-            });
-        });
-
+        if (elements.total) elements.total.textContent = stats.total || 0;
+        if (elements.available_3d) elements.available_3d.textContent = stats.available_3d || 0;
+        if (elements.available_7d) elements.available_7d.textContent = stats.available_7d || 0;
+        if (elements.sold) elements.sold.textContent = stats.sold || 0;
+        if (elements.personal) elements.personal.textContent = stats.personal || 0;
+        
     } catch (error) {
-        console.error('❌ Login error:', error);
-        res.status(500).json({ error: 'Terjadi kesalahan server' });
+        console.error('Error loading statistics:', error);
+        ['total', 'available_3d', 'available_7d', 'sold', 'personal'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = '0';
+        });
+    }
+}
+
+// ============ RENDER ACCOUNTS ============
+function renderAccounts(accounts) {
+    const tbody = document.getElementById('accountTableBody');
+    if (!tbody) {
+        console.warn('⚠️ accountTableBody not found');
+        return;
+    }
+    
+    if (!accounts || accounts.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-gray-500">Belum ada akun</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = accounts.map(acc => {
+        const statusLabel = acc.status === 'available' ? 'Tersedia' :
+                           acc.status === 'available_3d' ? '3 Hari' :
+                           acc.status === 'sold' ? 'Terjual' : 'Pribadi';
+        const date = new Date(acc.created_at).toLocaleString('id-ID');
+        const days = Math.floor((Date.now() - new Date(acc.created_at)) / (1000 * 60 * 60 * 24));
+        
+        return `
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3"><input type="checkbox" class="account-checkbox" value="${acc._id}" onchange="toggleAccount('${acc._id}')"></td>
+                <td class="px-4 py-3 text-sm">#${acc._id.slice(-6)}</td>
+                <td class="px-4 py-3 font-medium">${acc.username}</td>
+                <td class="px-4 py-3 text-sm">${acc.email || '-'}</td>
+                <td class="px-4 py-3 text-sm">${days} hari</td>
+                <td class="px-4 py-3 text-sm">${date}</td>
+                <td class="px-4 py-3"><span class="status-badge status-gray">${statusLabel}</span></td>
+                <td class="px-4 py-3">
+                    <button onclick="showDetail('${acc._id}')" class="btn-action btn-detail">Detail</button>
+                    <button onclick="editAccount('${acc._id}')" class="btn-action btn-edit">Edit</button>
+                    <button onclick="deleteAccount('${acc._id}')" class="btn-action btn-delete">Hapus</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// ============ FILTER ============
+function filterAccounts() {
+    const search = document.getElementById('searchInput');
+    const statusFilter = document.getElementById('statusFilter');
+    
+    if (!search || !statusFilter) return;
+    
+    const searchTerm = search.value.toLowerCase();
+    const status = statusFilter.value;
+    
+    let filtered = allAccounts;
+    if (searchTerm) filtered = filtered.filter(a => a.username.toLowerCase().includes(searchTerm) || (a.email && a.email.toLowerCase().includes(searchTerm)));
+    if (status !== 'all') filtered = filtered.filter(a => a.status === status);
+    renderAccounts(filtered);
+}
+
+// ============ TOGGLE FORM ============
+function toggleForm(form) {
+    ['add', 'bulk', 'ambil', 'status'].forEach(f => {
+        const el = document.getElementById(f + 'Form');
+        if (el) el.classList.add('hidden');
+    });
+    if (form) {
+        const el = document.getElementById(form + 'Form');
+        if (el) {
+            el.classList.remove('hidden');
+            if (form === 'ambil') loadAmbilList();
+            if (form === 'status') loadStatusList();
+        }
+    }
+}
+
+// ============ ADD ACCOUNT ============
+document.getElementById('addAccountForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('email').value;
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const totp = document.getElementById('totp').value;
+    
+    if (!username || !password) {
+        showNotification('Username dan password wajib diisi!', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_URL}/accounts`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, username, password, totp }),
+            credentials: 'include'
+        });
+        if (!response.ok) throw new Error('Gagal menambahkan');
+        showNotification('✅ Akun berhasil ditambahkan!', 'success');
+        document.getElementById('addAccountForm').reset();
+        toggleForm('add');
+        loadData();
+    } catch (error) {
+        showNotification('❌ ' + error.message, 'error');
     }
 });
 
-// Logout API
-app.post('/api/logout', (req, res) => {
-    req.session.destroy((err) => {
-        if (err) {
-            console.error('Logout error:', err);
-            return res.status(500).json({ error: 'Logout gagal' });
-        }
-        res.clearCookie('sessionId');
-        res.json({ success: true });
-    });
-});
+// ============ BULK ADD ============
+async function submitBulk() {
+    const data = document.getElementById('bulkData').value;
+    const lines = data.split('\n').filter(l => l.trim());
+    if (lines.length === 0) {
+        showNotification('Masukkan data akun!', 'error');
+        return;
+    }
+    
+    const accounts = lines.map(line => {
+        const parts = line.split(':').map(p => p.trim());
+        if (parts.length === 3) return { email: '', username: parts[0], password: parts[1], totp: parts[2] };
+        if (parts.length === 4) return { email: parts[0], username: parts[1], password: parts[2], totp: parts[3] };
+        return null;
+    }).filter(a => a && a.username && a.password);
+    
+    if (accounts.length === 0) {
+        showNotification('Format salah! Gunakan: email:username:password:totp', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_URL}/accounts/bulk`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ accounts }),
+            credentials: 'include'
+        });
+        if (!response.ok) throw new Error('Gagal menambahkan');
+        const result = await response.json();
+        showNotification(`✅ ${result.message}`, 'success');
+        document.getElementById('bulkData').value = '';
+        toggleForm('bulk');
+        loadData();
+    } catch (error) {
+        showNotification('❌ ' + error.message, 'error');
+    }
+}
 
-// Check session
-app.get('/api/check-auth', (req, res) => {
-    console.log('🔍 Check-auth - Session user:', req.session.user);
-    console.log('🔍 Check-auth - Session ID:', req.sessionID);
-    if (req.session.user) {
-        res.json({ authenticated: true, user: { username: req.session.user.username } });
+// ============ AMBIL AKUN ============
+function loadAmbilList() {
+    const list = document.getElementById('ambilAccountList');
+    if (!list) return;
+    
+    const available = allAccounts.filter(a => a.status === 'available' || a.status === 'available_3d');
+    if (available.length === 0) {
+        list.innerHTML = '<p class="text-gray-500 p-4">Tidak ada akun tersedia</p>';
+        return;
+    }
+    list.innerHTML = available.map(a => {
+        const statusLabel = a.status === 'available' ? 'Tersedia' : '3 Hari';
+        return `
+            <div class="flex items-center gap-3 p-2 border-b hover:bg-gray-50">
+                <input type="checkbox" class="ambil-checkbox" value="${a._id}" onchange="toggleAmbil('${a._id}')">
+                <span class="font-medium">${a.username}</span>
+                <span class="text-sm text-gray-500">${a.email || '-'}</span>
+                <span class="status-badge status-gray">${statusLabel}</span>
+                <span class="text-sm text-gray-400">${Math.floor((Date.now() - new Date(a.created_at)) / (1000 * 60 * 60 * 24))} hari</span>
+            </div>
+        `;
+    }).join('');
+    window.ambilSelected = new Set();
+}
+
+function toggleAmbil(id) {
+    if (window.ambilSelected.has(id)) window.ambilSelected.delete(id);
+    else window.ambilSelected.add(id);
+}
+
+async function ambilAkun() {
+    const ids = Array.from(window.ambilSelected || []);
+    if (ids.length === 0) {
+        showNotification('Pilih minimal 1 akun!', 'error');
+        return;
+    }
+    
+    const accounts = allAccounts.filter(a => ids.includes(a._id));
+    const text = accounts.map(a => `${a.email || ''}:${a.username}:${a.password}:${a.totp || ''}`).join('\n');
+    
+    if (confirm(`${accounts.length} akun siap diambil.\nOK = Salin clipboard\nCancel = Download TXT`)) {
+        try {
+            await navigator.clipboard.writeText(text);
+            showNotification(`✅ ${accounts.length} akun disalin!`, 'success');
+        } catch {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            showNotification(`✅ ${accounts.length} akun disalin!`, 'success');
+        }
     } else {
-        res.json({ authenticated: false });
+        const blob = new Blob([text], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `akun_${new Date().toISOString().slice(0,10)}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showNotification(`✅ ${accounts.length} akun di-download!`, 'success');
     }
-});
+    
+    await updateStatusBulk(ids, 'sold');
+    toggleForm('ambil');
+    loadData();
+}
 
-// ============ PROTECTED STATIC ROUTES ============
-app.get('/', isAuthenticated, (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+// ============ BULK STATUS ============
+function loadStatusList() {
+    const list = document.getElementById('statusAccountList');
+    if (!list) return;
+    
+    if (allAccounts.length === 0) {
+        list.innerHTML = '<p class="text-gray-500 p-4">Belum ada akun</p>';
+        return;
+    }
+    list.innerHTML = allAccounts.map(a => {
+        const statusLabel = a.status === 'available' ? 'Tersedia' :
+                           a.status === 'available_3d' ? '3 Hari' :
+                           a.status === 'sold' ? 'Terjual' : 'Pribadi';
+        return `
+            <div class="flex items-center gap-3 p-2 border-b hover:bg-gray-50">
+                <input type="checkbox" class="status-checkbox" value="${a._id}" onchange="toggleStatus('${a._id}')">
+                <span class="font-medium">${a.username}</span>
+                <span class="text-sm text-gray-500">${a.email || '-'}</span>
+                <span class="status-badge status-gray">${statusLabel}</span>
+            </div>
+        `;
+    }).join('');
+    window.statusSelected = new Set();
+}
 
-app.get('*.css', isAuthenticated, (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', req.path));
-});
+function toggleStatus(id) {
+    if (window.statusSelected.has(id)) window.statusSelected.delete(id);
+    else window.statusSelected.add(id);
+}
 
-app.get('*.js', isAuthenticated, (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', req.path));
-});
+async function updateBulkStatus(status) {
+    const ids = Array.from(window.statusSelected || []);
+    if (ids.length === 0) {
+        showNotification('Pilih minimal 1 akun!', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_URL}/accounts/bulk/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids, status }),
+            credentials: 'include'
+        });
+        if (!response.ok) throw new Error('Gagal update');
+        const result = await response.json();
+        showNotification(`✅ ${result.message}`, 'success');
+        toggleForm('status');
+        loadData();
+    } catch (error) {
+        showNotification('❌ ' + error.message, 'error');
+    }
+}
 
-// ============ MONGODB SCHEMA ============
-const accountSchema = new mongoose.Schema({
-    email: { type: String, default: '', trim: true, lowercase: true },
-    username: { type: String, required: true, trim: true },
-    password: { type: String, required: true, trim: true },
-    totp: { type: String, default: '', trim: true },
-    status: {
-        type: String,
-        enum: ['available', 'sold', 'personal', 'available_3d'],
-        default: 'available'
-    },
-    created_at: { type: Date, default: Date.now }
-});
+// ============ DETAIL ============
+function showDetail(id) {
+    const acc = allAccounts.find(a => a._id === id);
+    if (!acc) return;
+    
+    const statusLabel = acc.status === 'available' ? 'Tersedia' :
+                       acc.status === 'available_3d' ? '3 Hari' :
+                       acc.status === 'sold' ? 'Terjual' : 'Pribadi';
+    
+    document.getElementById('modalTitle').textContent = `Detail - ${acc.username}`;
+    document.getElementById('modalBody').innerHTML = `
+        <div class="space-y-2">
+            <p><strong>ID:</strong> ${acc._id}</p>
+            <p><strong>Username:</strong> ${acc.username}</p>
+            <p><strong>Email:</strong> ${acc.email || '-'}</p>
+            <p><strong>Password:</strong> <code class="bg-gray-100 px-2 py-1 rounded">${acc.password}</code></p>
+            <p><strong>TOTP:</strong> ${acc.totp || '-'}</p>
+            <p><strong>Status:</strong> <span class="status-badge status-gray">${statusLabel}</span></p>
+            <p><strong>Umur:</strong> ${Math.floor((Date.now() - new Date(acc.created_at)) / (1000 * 60 * 60 * 24))} hari</p>
+            <p><strong>Ditambahkan:</strong> ${new Date(acc.created_at).toLocaleString('id-ID')}</p>
+        </div>
+    `;
+    document.getElementById('accountModal').classList.remove('hidden');
+}
 
-accountSchema.virtual('days').get(function() {
-    const now = new Date();
-    const diff = now - this.created_at;
-    return Math.floor(diff / (1000 * 60 * 60 * 24));
-});
+function closeModal() {
+    document.getElementById('accountModal').classList.add('hidden');
+}
 
-accountSchema.set('toJSON', { virtuals: true });
-accountSchema.set('toObject', { virtuals: true });
+function closeModalOutside(e) {
+    if (e.target === e.currentTarget) closeModal();
+}
 
-const Account = mongoose.model('Account', accountSchema);
+// ============ EDIT ============
+function editAccount(id) {
+    const acc = allAccounts.find(a => a._id === id);
+    if (!acc) return;
+    const newUser = prompt('Username baru:', acc.username);
+    if (newUser && newUser !== acc.username) {
+        updateAccount(id, { username: newUser });
+    }
+}
 
-// ============ API ROUTES ============
-app.use('/api/accounts', isAuthenticated);
-app.use('/api/statistics', isAuthenticated);
+async function updateAccount(id, data) {
+    try {
+        const response = await fetch(`${API_URL}/accounts/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+            credentials: 'include'
+        });
+        if (!response.ok) throw new Error('Gagal update');
+        showNotification('✅ Akun diupdate!', 'success');
+        loadData();
+    } catch (error) {
+        showNotification('❌ ' + error.message, 'error');
+    }
+}
 
-app.get('/api/health', isAuthenticated, (req, res) => {
-    res.json({
-        status: 'ok',
-        timestamp: new Date().toISOString(),
-        mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-        uptime: process.uptime()
+// ============ DELETE ============
+async function deleteAccount(id) {
+    const acc = allAccounts.find(a => a._id === id);
+    if (!acc || !confirm(`Hapus "${acc.username}"?`)) return;
+    try {
+        const response = await fetch(`${API_URL}/accounts/${id}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+        if (!response.ok) throw new Error('Gagal hapus');
+        showNotification('✅ Akun dihapus!', 'success');
+        loadData();
+    } catch (error) {
+        showNotification('❌ ' + error.message, 'error');
+    }
+}
+
+// ============ SELECT ALL ============
+function toggleSelectAll() {
+    const checked = document.getElementById('selectAll').checked;
+    document.querySelectorAll('.account-checkbox').forEach(cb => {
+        cb.checked = checked;
+        if (checked) selectedAccounts.add(cb.value);
+        else selectedAccounts.delete(cb.value);
     });
-});
+}
 
-app.get('/api/accounts', async (req, res) => {
+function toggleAccount(id) {
+    if (selectedAccounts.has(id)) selectedAccounts.delete(id);
+    else selectedAccounts.add(id);
+}
+
+// ============ NOTIFICATION ============
+function showNotification(msg, type = 'info') {
+    const existing = document.querySelector('.notification');
+    if (existing) existing.remove();
+    const div = document.createElement('div');
+    div.className = `notification ${type}`;
+    div.innerHTML = `${msg} <button onclick="this.parentElement.remove()" class="ml-4 text-xl">&times;</button>`;
+    document.body.appendChild(div);
+    setTimeout(() => div.remove(), 5000);
+}
+
+// ============ REFRESH ============
+function refreshData() { 
+    console.log('🔄 Refresh triggered');
+    loadData(); 
+}
+
+// ============ INIT ============
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log('🚀 Page loaded, checking auth...');
+    
     try {
-        const accounts = await Account.find().sort({ created_at: -1 });
-        res.json(accounts);
+        const auth = await checkAuth();
+        console.log('📡 Auth result:', auth);
+        
+        if (!auth || !auth.authenticated) {
+            console.log('🔒 Not authenticated, redirecting...');
+            return;
+        }
+        
+        console.log('📊 Loading dashboard data...');
+        await loadData();
+        console.log('✅ Dashboard loaded successfully');
+        
     } catch (error) {
-        console.error('Error fetching accounts:', error);
-        res.status(500).json({ error: 'Gagal mengambil data' });
+        console.error('❌ Fatal error:', error);
+        document.body.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:20px;padding:20px;text-align:center;">
+                <h1 style="font-size:24px;color:#1a1a1a;">⚠️ Terjadi Kesalahan</h1>
+                <p style="color:#666;max-width:400px;">${error.message || 'Gagal memuat halaman. Silakan refresh atau coba lagi nanti.'}</p>
+                <button onclick="location.reload()" style="padding:12px 24px;background:#1a1a1a;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;">
+                    <i class="fas fa-sync"></i> Refresh Halaman
+                </button>
+                <button onclick="window.location.href='/login.html'" style="padding:12px 24px;background:transparent;color:#1a1a1a;border:1px solid #ccc;border-radius:8px;cursor:pointer;font-weight:600;">
+                    <i class="fas fa-sign-in-alt"></i> Ke Halaman Login
+                </button>
+            </div>
+        `;
     }
 });
 
-app.get('/api/statistics', async (req, res) => {
-    try {
-        const total = await Account.countDocuments();
-        const available_3d = await Account.countDocuments({
-            status: 'available',
-            created_at: { $gte: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) }
-        });
-        const available_7d = await Account.countDocuments({
-            status: { $in: ['available', 'available_3d'] },
-            created_at: { $lt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) }
-        });
-        const sold = await Account.countDocuments({ status: 'sold' });
-        const personal = await Account.countDocuments({ status: 'personal' });
-
-        res.json({ total, available_3d, available_7d, sold, personal });
-    } catch (error) {
-        console.error('Error fetching statistics:', error);
-        res.status(500).json({ error: 'Gagal mengambil statistik' });
+// ============ ESC KEY ============
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeModal();
     }
-});
-
-app.post('/api/accounts', [
-    body('email').optional().isEmail().normalizeEmail(),
-    body('username').trim().isLength({ min: 1, max: 100 }),
-    body('password').trim().isLength({ min: 1, max: 100 }),
-    body('totp').optional().trim().isLength({ max: 50 })
-], async (req, res) => {
-    try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ error: 'Data tidak valid' });
-        }
-
-        const { email, username, password, totp } = req.body;
-        if (!username || !password) {
-            return res.status(400).json({ error: 'Username dan password wajib diisi' });
-        }
-
-        const account = new Account({
-            email: email || '',
-            username: username.trim(),
-            password: password.trim(),
-            totp: totp || '',
-            created_at: new Date()
-        });
-
-        await account.save();
-        console.log('✅ Account saved:', account._id);
-        res.status(201).json(account);
-    } catch (error) {
-        console.error('❌ Error saving account:', error);
-        res.status(500).json({ error: 'Gagal menyimpan akun' });
-    }
-});
-
-app.post('/api/accounts/bulk', async (req, res) => {
-    try {
-        const { accounts } = req.body;
-        if (!accounts || !Array.isArray(accounts) || accounts.length === 0) {
-            return res.status(400).json({ error: 'Data tidak valid' });
-        }
-
-        if (accounts.length > 100) {
-            return res.status(400).json({ error: 'Maksimal 100 akun per request' });
-        }
-
-        const created = [];
-        for (const acc of accounts) {
-            const { email, username, password, totp } = acc;
-            if (username && password) {
-                const account = new Account({
-                    email: email || '',
-                    username: username.trim(),
-                    password: password.trim(),
-                    totp: totp || '',
-                    created_at: new Date()
-                });
-                await account.save();
-                created.push(account);
-            }
-        }
-        res.status(201).json({
-            message: `Berhasil menambahkan ${created.length} akun`,
-            accounts: created
-        });
-    } catch (error) {
-        console.error('❌ Error saving bulk accounts:', error);
-        res.status(500).json({ error: 'Gagal menyimpan akun' });
-    }
-});
-
-app.put('/api/accounts/bulk/status', async (req, res) => {
-    try {
-        const { ids, status } = req.body;
-        if (!ids || !Array.isArray(ids) || ids.length === 0) {
-            return res.status(400).json({ error: 'ID tidak valid' });
-        }
-
-        if (ids.length > 100) {
-            return res.status(400).json({ error: 'Maksimal 100 ID per request' });
-        }
-
-        if (!['available', 'sold', 'personal', 'available_3d'].includes(status)) {
-            return res.status(400).json({ error: 'Status tidak valid' });
-        }
-
-        const result = await Account.updateMany(
-            { _id: { $in: ids } },
-            { status }
-        );
-
-        res.json({
-            message: `Berhasil update ${result.modifiedCount} akun`,
-            modified: result.modifiedCount
-        });
-    } catch (error) {
-        console.error('❌ Error updating bulk status:', error);
-        res.status(500).json({ error: 'Gagal update status' });
-    }
-});
-
-app.put('/api/accounts/:id', [
-    body('email').optional().isEmail().normalizeEmail(),
-    body('username').optional().trim().isLength({ min: 1, max: 100 }),
-    body('password').optional().trim().isLength({ min: 1, max: 100 }),
-    body('totp').optional().trim().isLength({ max: 50 })
-], async (req, res) => {
-    try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ error: 'Data tidak valid' });
-        }
-
-        const { email, username, password, totp } = req.body;
-        const updateData = {};
-        if (email !== undefined) updateData.email = email.trim();
-        if (username !== undefined) updateData.username = username.trim();
-        if (password !== undefined) updateData.password = password.trim();
-        if (totp !== undefined) updateData.totp = totp.trim();
-
-        const account = await Account.findByIdAndUpdate(
-            req.params.id,
-            updateData,
-            { new: true, runValidators: true }
-        );
-        if (!account) return res.status(404).json({ error: 'Akun tidak ditemukan' });
-        res.json(account);
-    } catch (error) {
-        console.error('Error updating account:', error);
-        res.status(500).json({ error: 'Gagal update akun' });
-    }
-});
-
-app.delete('/api/accounts/:id', async (req, res) => {
-    try {
-        const account = await Account.findByIdAndDelete(req.params.id);
-        if (!account) return res.status(404).json({ error: 'Akun tidak ditemukan' });
-        res.json({ message: 'Akun berhasil dihapus' });
-    } catch (error) {
-        console.error('Error deleting account:', error);
-        res.status(500).json({ error: 'Gagal hapus akun' });
-    }
-});
-
-// ============ KONEKSI MONGODB ============
-console.log('🔄 Connecting to MongoDB Atlas...');
-
-mongoose.connect(process.env.MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-    serverSelectionTimeoutMS: 10000,
-    socketTimeoutMS: 45000,
-})
-    .then(() => {
-        console.log('✅ Connected to MongoDB Atlas');
-        console.log(`📊 Database: ${mongoose.connection.db.databaseName}`);
-
-        if (!process.env.ADMIN_PASSWORD_HASH) {
-            console.log('\n⚠️  PASSWORD HASH BELUM DISET!');
-            console.log('Generate dengan: node -e "console.log(require(\'bcryptjs\').hashSync(\'rahasia123\', 10))"');
-            console.log('Lalu tambahkan ke .env: ADMIN_PASSWORD_HASH=hasil_hash\n');
-        }
-
-        app.listen(PORT, '0.0.0.0', () => {
-            console.log(`🚀 Server running on http://localhost:${PORT}`);
-            console.log(`🔐 Login: ${process.env.ADMIN_USERNAME || 'admin'} / password dari .env`);
-            console.log(`🛡️  Security: Helmet, Rate Limit, Session, CSRF Protection`);
-        });
-    })
-    .catch(err => {
-        console.error('❌ MongoDB connection error:', err);
-        app.listen(PORT, '0.0.0.0', () => {
-            console.log(`🚀 Server running (without DB) on http://localhost:${PORT}`);
-        });
-    });
-
-process.on('unhandledRejection', (err) => {
-    console.error('Unhandled Rejection:', err);
 });
