@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 const session = require('express-session');
+const MongoStore = require('connect-mongo');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const bcrypt = require('bcryptjs');
@@ -49,11 +50,19 @@ app.use((req, res, next) => {
     next();
 });
 
-// ============ SESSION ============
+// ============ SESSION WITH MONGOSTORE ============
 app.use(session({
     secret: process.env.SESSION_SECRET || 'your-secret-key-min-32-chars',
     resave: false,
     saveUninitialized: false,
+    store: MongoStore.create({
+        mongoUrl: process.env.MONGODB_URI,
+        touchAfter: 24 * 3600,
+        crypto: {
+            secret: process.env.SESSION_SECRET || 'your-secret-key-min-32-chars'
+        },
+        collectionName: 'sessions'
+    }),
     cookie: {
         secure: process.env.NODE_ENV === 'production',
         httpOnly: true,
@@ -68,7 +77,7 @@ app.use(session({
 // ============ MIDDLEWARE ============
 app.use(cors({
     origin: process.env.NODE_ENV === 'production' 
-        ? ['https://your-domain.vercel.app'] 
+        ? ['https://your-domain.vercel.app', 'https://webstokaccghakbzq07.vercel.app'] 
         : ['http://localhost:3000', 'http://localhost:5173'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -116,7 +125,6 @@ app.post('/api/login', loginLimiter, [
     body('username').trim().isLength({ min: 3, max: 50 }).escape(),
     body('password').trim().isLength({ min: 3, max: 100 }).escape()
 ], async (req, res) => {
-    // ✅ Set Content-Type ke JSON
     res.setHeader('Content-Type', 'application/json');
     
     try {
@@ -130,27 +138,24 @@ app.post('/api/login', loginLimiter, [
         const validPasswordHash = process.env.ADMIN_PASSWORD_HASH;
 
         console.log('🔍 Login attempt:', { username });
-        console.log('🔍 Hash from env:', validPasswordHash ? '✅ ADA' : '❌ TIDAK ADA');
 
         if (!validPasswordHash) {
             console.error('❌ ADMIN_PASSWORD_HASH not set in .env');
-            return res.status(500).json({ error: 'Server configuration error - Password hash not set' });
+            return res.status(500).json({ error: 'Server configuration error' });
         }
 
-        // Check username
         if (username !== validUsername) {
-            console.log('❌ Username salah:', username);
+            console.log('❌ Username salah');
             return res.status(401).json({ error: 'Username atau password salah' });
         }
 
-        // Check password dengan bcrypt
         let isValidPassword = false;
         try {
             isValidPassword = await bcrypt.compare(password, validPasswordHash);
             console.log('🔍 Password valid:', isValidPassword);
         } catch (bcryptError) {
             console.error('❌ Bcrypt error:', bcryptError.message);
-            return res.status(500).json({ error: 'Server configuration error - Invalid hash format' });
+            return res.status(500).json({ error: 'Server configuration error' });
         }
 
         if (!isValidPassword) {
@@ -158,7 +163,6 @@ app.post('/api/login', loginLimiter, [
             return res.status(401).json({ error: 'Username atau password salah' });
         }
 
-        // ✅ LOGIN BERHASIL
         console.log('✅ Login successful for:', username);
         
         req.session.user = { 
@@ -185,13 +189,14 @@ app.post('/api/login', loginLimiter, [
             
             res.json({ 
                 success: true, 
-                message: 'Login berhasil'
+                message: 'Login berhasil',
+                redirect: '/'
             });
         });
 
     } catch (error) {
         console.error('❌ Login error:', error);
-        res.status(500).json({ error: 'Terjadi kesalahan server: ' + error.message });
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
     }
 });
 
@@ -474,7 +479,7 @@ mongoose.connect(process.env.MONGODB_URI, {
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 Server running on http://localhost:${PORT}`);
             console.log(`🔐 Login: ${process.env.ADMIN_USERNAME || 'admin'} / password dari .env`);
-            console.log(`🛡️  Security: Helmet, Rate Limit, Session, CSRF Protection`);
+            console.log(`🛡️  Security: Helmet, Rate Limit, Session (MongoStore), CSRF Protection`);
         });
     })
     .catch(err => {
