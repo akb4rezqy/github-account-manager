@@ -7,7 +7,12 @@ async function checkAuth() {
     try {
         console.log('🔍 Checking auth...');
         const response = await fetch('/api/check-auth', {
-            credentials: 'include'
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache, no-store, must-revalidate'
+            }
         });
         
         if (!response.ok) {
@@ -24,11 +29,17 @@ async function checkAuth() {
             return { authenticated: false };
         }
         
+        if (data.user) {
+            const userDisplay = document.getElementById('userDisplay');
+            if (userDisplay) {
+                userDisplay.textContent = `👤 ${data.user.username}`;
+            }
+        }
+        
         return data;
     } catch (error) {
         console.error('❌ Auth check error:', error);
-        // Tampilkan error di halaman
-        showNotification('❌ Gagal terhubung ke server', 'error');
+        window.location.href = '/login.html';
         return { authenticated: false };
     }
 }
@@ -37,11 +48,13 @@ async function checkAuth() {
 async function logout() {
     if (!confirm('Yakin ingin logout?')) return;
     try {
-        await fetch('/api/logout', { 
+        const response = await fetch('/api/logout', { 
             method: 'POST',
             credentials: 'include'
         });
-        window.location.href = '/login.html';
+        if (response.ok) {
+            window.location.href = '/login.html';
+        }
     } catch (error) {
         console.error('Logout failed:', error);
         showNotification('❌ Gagal logout', 'error');
@@ -62,7 +75,10 @@ async function loadData() {
 async function loadAccounts() {
     try {
         const response = await fetch(`${API_URL}/accounts`, {
-            credentials: 'include'
+            credentials: 'include',
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate'
+            }
         });
         if (!response.ok) {
             if (response.status === 401) {
@@ -76,7 +92,6 @@ async function loadAccounts() {
     } catch (error) {
         console.error('Error loading accounts:', error);
         showNotification('❌ Gagal memuat akun', 'error');
-        // Tampilkan tabel kosong
         renderAccounts([]);
     }
 }
@@ -101,7 +116,6 @@ async function loadStatistics() {
         document.getElementById('personal').textContent = stats.personal || 0;
     } catch (error) {
         console.error('Error loading statistics:', error);
-        // Set ke 0
         ['total', 'available_3d', 'available_7d', 'sold', 'personal'].forEach(id => {
             document.getElementById(id).textContent = '0';
         });
@@ -472,32 +486,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log('🚀 Page loaded, checking auth...');
     
     try {
-        // Cek auth dulu
         const auth = await checkAuth();
         console.log('📡 Auth result:', auth);
         
-        // Kalo ga authenticated, redirect sudah terjadi di checkAuth
         if (!auth || !auth.authenticated) {
             console.log('🔒 Not authenticated, redirecting...');
             return;
         }
         
-        // Kalo authenticated, tampilkan user
-        if (auth.user) {
-            const userDisplay = document.getElementById('userDisplay');
-            if (userDisplay) {
-                userDisplay.textContent = `👤 ${auth.user.username}`;
-            }
-        }
-        
-        // Load data
         console.log('📊 Loading dashboard data...');
         await loadData();
         console.log('✅ Dashboard loaded successfully');
         
     } catch (error) {
         console.error('❌ Fatal error:', error);
-        // Tampilkan pesan error
         document.body.innerHTML = `
             <div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:20px;padding:20px;text-align:center;">
                 <h1 style="font-size:24px;color:#1a1a1a;">⚠️ Terjadi Kesalahan</h1>
