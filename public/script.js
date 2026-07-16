@@ -2,6 +2,33 @@ const API_URL = window.location.origin + '/api';
 let allAccounts = [];
 let selectedAccounts = new Set();
 
+// ============ CHECK AUTH ============
+async function checkAuth() {
+    try {
+        const response = await fetch('/api/check-auth');
+        const data = await response.json();
+        if (!data.authenticated) {
+            window.location.href = '/login.html';
+        }
+        return data;
+    } catch (error) {
+        console.error('Auth check failed:', error);
+        window.location.href = '/login.html';
+    }
+}
+
+// ============ LOGOUT ============
+async function logout() {
+    if (!confirm('Yakin ingin logout?')) return;
+    try {
+        await fetch('/api/logout', { method: 'POST' });
+        window.location.href = '/login.html';
+    } catch (error) {
+        console.error('Logout failed:', error);
+        showNotification('❌ Gagal logout', 'error');
+    }
+}
+
 // ============ LOAD DATA ============
 async function loadData() {
     try {
@@ -385,4 +412,10 @@ function showNotification(msg, type = 'info') {
 function refreshData() { loadData(); }
 
 // ============ INIT ============
-document.addEventListener('DOMContentLoaded', loadData);
+document.addEventListener('DOMContentLoaded', async () => {
+    const auth = await checkAuth();
+    if (auth && auth.user) {
+        document.getElementById('userDisplay').textContent = `👤 ${auth.user.username}`;
+    }
+    loadData();
+});
