@@ -61,90 +61,101 @@ async function logout() {
     }
 }
 
-// ============ LOAD DATA ============
+// ============ LOAD DATA - FIX ============
 async function loadData() {
     try {
         console.log('📊 Loading data...');
         
-        // ✅ Load sequential
-        await loadAccounts();
-        await loadStatistics();
+        // ✅ Gunakan Promise.all dengan error handling per request
+        const [accountsResult, statsResult] = await Promise.allSettled([
+            fetchAccounts(),
+            fetchStatistics()
+        ]);
         
-        console.log('✅ All data loaded successfully');
+        // Handle accounts
+        if (accountsResult.status === 'fulfilled') {
+            allAccounts = accountsResult.value;
+            renderAccounts(allAccounts);
+            console.log(`✅ Loaded ${allAccounts.length} accounts`);
+        } else {
+            console.error('❌ Failed to load accounts:', accountsResult.reason);
+            renderAccounts([]);
+            showNotification('❌ Gagal memuat akun', 'error');
+        }
+        
+        // Handle statistics
+        if (statsResult.status === 'fulfilled') {
+            updateStatistics(statsResult.value);
+            console.log('✅ Statistics loaded:', statsResult.value);
+        } else {
+            console.error('❌ Failed to load statistics:', statsResult.reason);
+            resetStatistics();
+        }
+        
+        console.log('✅ All data processed');
+        
     } catch (error) {
         console.error('Error loading data:', error);
         showNotification('❌ Gagal memuat data: ' + error.message, 'error');
     }
 }
 
-async function loadAccounts() {
-    try {
-        console.log('📊 Loading accounts...');
-        const response = await fetch(`${API_URL}/accounts`, {
-            credentials: 'include',
-            headers: {
-                'Cache-Control': 'no-cache, no-store, must-revalidate'
-            }
-        });
-        
-        if (!response.ok) {
-            if (response.status === 401) {
-                window.location.href = '/login.html';
-                return;
-            }
-            throw new Error('Failed to fetch accounts');
+async function fetchAccounts() {
+    const response = await fetch(`${API_URL}/accounts`, {
+        credentials: 'include',
+        headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
         }
-        
-        allAccounts = await response.json();
-        console.log(`✅ Loaded ${allAccounts.length} accounts`);
-        renderAccounts(allAccounts);
-    } catch (error) {
-        console.error('Error loading accounts:', error);
-        showNotification('❌ Gagal memuat akun', 'error');
-        renderAccounts([]);
+    });
+    
+    if (!response.ok) {
+        if (response.status === 401) {
+            window.location.href = '/login.html';
+            return;
+        }
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
+    
+    return await response.json();
 }
 
-async function loadStatistics() {
-    try {
-        console.log('📊 Loading statistics...');
-        const response = await fetch(`${API_URL}/statistics`, {
-            credentials: 'include'
-        });
-        
-        if (!response.ok) {
-            if (response.status === 401) {
-                window.location.href = '/login.html';
-                return;
-            }
-            throw new Error('Failed to fetch statistics');
+async function fetchStatistics() {
+    const response = await fetch(`${API_URL}/statistics`, {
+        credentials: 'include'
+    });
+    
+    if (!response.ok) {
+        if (response.status === 401) {
+            window.location.href = '/login.html';
+            return;
         }
-        
-        const stats = await response.json();
-        console.log('✅ Statistics loaded:', stats);
-        
-        // ✅ Update dengan aman
-        const elements = {
-            total: document.getElementById('total'),
-            available_3d: document.getElementById('available_3d'),
-            available_7d: document.getElementById('available_7d'),
-            sold: document.getElementById('sold'),
-            personal: document.getElementById('personal')
-        };
-        
-        if (elements.total) elements.total.textContent = stats.total || 0;
-        if (elements.available_3d) elements.available_3d.textContent = stats.available_3d || 0;
-        if (elements.available_7d) elements.available_7d.textContent = stats.available_7d || 0;
-        if (elements.sold) elements.sold.textContent = stats.sold || 0;
-        if (elements.personal) elements.personal.textContent = stats.personal || 0;
-        
-    } catch (error) {
-        console.error('Error loading statistics:', error);
-        ['total', 'available_3d', 'available_7d', 'sold', 'personal'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.textContent = '0';
-        });
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
+    
+    return await response.json();
+}
+
+function updateStatistics(stats) {
+    const elements = {
+        total: document.getElementById('total'),
+        available_3d: document.getElementById('available_3d'),
+        available_7d: document.getElementById('available_7d'),
+        sold: document.getElementById('sold'),
+        personal: document.getElementById('personal')
+    };
+    
+    if (elements.total) elements.total.textContent = stats.total ?? 0;
+    if (elements.available_3d) elements.available_3d.textContent = stats.available_3d ?? 0;
+    if (elements.available_7d) elements.available_7d.textContent = stats.available_7d ?? 0;
+    if (elements.sold) elements.sold.textContent = stats.sold ?? 0;
+    if (elements.personal) elements.personal.textContent = stats.personal ?? 0;
+}
+
+function resetStatistics() {
+    ['total', 'available_3d', 'available_7d', 'sold', 'personal'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '0';
+    });
 }
 
 // ============ RENDER ACCOUNTS ============
