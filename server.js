@@ -41,20 +41,28 @@ const apiLimiter = rateLimit({
     message: { error: 'Terlalu banyak request. Coba lagi nanti.' },
 });
 
-// ============ SESSION - PERBAIKAN ============
+// ============ CACHE CONTROL ============
+app.use((req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    next();
+});
+
+// ============ SESSION ============
 app.use(session({
     secret: process.env.SESSION_SECRET || 'your-secret-key-min-32-chars',
     resave: false,
-    saveUninitialized: true, // ✅ UBAH ke true
+    saveUninitialized: false,
     cookie: {
-        secure: false, // ✅ SET false untuk localhost (http)
+        secure: false,
         httpOnly: true,
-        sameSite: 'lax', // ✅ UBAH ke 'lax'
-        maxAge: 24 * 60 * 60 * 1000,
-        path: '/' // ✅ TAMBAHKAN path
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        path: '/'
     },
     name: 'sessionId',
-    rolling: true // ✅ TAMBAHKAN - refresh session tiap request
+    rolling: true
 }));
 
 // ============ MIDDLEWARE ============
@@ -69,10 +77,10 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ✅ TAMBAHKAN LOG SESSION
+// ============ LOG SESSION ============
 app.use((req, res, next) => {
-    console.log('📝 Session ID:', req.sessionID);
-    console.log('📝 Session User:', req.session.user);
+    console.log(`📝 [${new Date().toISOString()}] Session ID:`, req.sessionID);
+    console.log(`📝 [${new Date().toISOString()}] Session User:`, req.session.user);
     next();
 });
 
@@ -123,7 +131,6 @@ app.post('/api/login', loginLimiter, [
         }
 
         if (username !== validUsername) {
-            console.log('❌ Username salah');
             return res.status(401).json({ error: 'Username atau password salah' });
         }
 
@@ -136,20 +143,36 @@ app.post('/api/login', loginLimiter, [
         }
 
         if (!isValidPassword) {
-            console.log('❌ Password salah');
             return res.status(401).json({ error: 'Username atau password salah' });
         }
 
-        // ✅ SIMPAN SESSION
-        req.session.user = { username, loginTime: Date.now() };
+        req.session.user = { 
+            username: username, 
+            loginTime: Date.now() 
+        };
+        
         req.session.save((err) => {
             if (err) {
                 console.error('❌ Session save error:', err);
                 return res.status(500).json({ error: 'Server error' });
             }
-            console.log('✅ Session saved! User:', req.session.user);
+            
+            console.log('✅ Session saved!');
             console.log('✅ Session ID:', req.sessionID);
-            res.json({ success: true, message: 'Login berhasil' });
+            console.log('✅ Session User:', req.session.user);
+            
+            res.cookie('sessionId', req.sessionID, {
+                httpOnly: true,
+                secure: false,
+                sameSite: 'lax',
+                maxAge: 7 * 24 * 60 * 60 * 1000,
+                path: '/'
+            });
+            
+            res.json({ 
+                success: true, 
+                message: 'Login berhasil'
+            });
         });
 
     } catch (error) {
