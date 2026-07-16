@@ -12,7 +12,11 @@
     "mongoose": "^8.0.0",
     "dotenv": "^16.3.1",
     "cors": "^2.8.5",
-    "bcryptjs": "^2.4.3"
+    "express-session": "^1.17.3",
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0",
+    "bcryptjs": "^2.4.3",
+    "express-validator": "^7.0.1"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
