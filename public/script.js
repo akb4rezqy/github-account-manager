@@ -5,15 +5,31 @@ let selectedAccounts = new Set();
 // ============ CHECK AUTH ============
 async function checkAuth() {
     try {
-        const response = await fetch('/api/check-auth');
-        const data = await response.json();
-        if (!data.authenticated) {
-            window.location.href = '/login.html';
+        console.log('🔍 Checking auth...');
+        const response = await fetch('/api/check-auth', {
+            credentials: 'include'
+        });
+        
+        if (!response.ok) {
+            console.error('❌ Auth check failed:', response.status);
+            return { authenticated: false };
         }
+        
+        const data = await response.json();
+        console.log('✅ Auth response:', data);
+        
+        if (!data.authenticated) {
+            console.log('🔒 Not authenticated, redirecting to login...');
+            window.location.href = '/login.html';
+            return { authenticated: false };
+        }
+        
         return data;
     } catch (error) {
-        console.error('Auth check failed:', error);
-        window.location.href = '/login.html';
+        console.error('❌ Auth check error:', error);
+        // Tampilkan error di halaman
+        showNotification('❌ Gagal terhubung ke server', 'error');
+        return { authenticated: false };
     }
 }
 
@@ -21,7 +37,10 @@ async function checkAuth() {
 async function logout() {
     if (!confirm('Yakin ingin logout?')) return;
     try {
-        await fetch('/api/logout', { method: 'POST' });
+        await fetch('/api/logout', { 
+            method: 'POST',
+            credentials: 'include'
+        });
         window.location.href = '/login.html';
     } catch (error) {
         console.error('Logout failed:', error);
@@ -32,29 +51,48 @@ async function logout() {
 // ============ LOAD DATA ============
 async function loadData() {
     try {
+        console.log('📊 Loading data...');
         await Promise.all([loadAccounts(), loadStatistics()]);
     } catch (error) {
         console.error('Error loading data:', error);
-        showNotification('❌ Gagal memuat data', 'error');
+        showNotification('❌ Gagal memuat data: ' + error.message, 'error');
     }
 }
 
 async function loadAccounts() {
     try {
-        const response = await fetch(`${API_URL}/accounts`);
-        if (!response.ok) throw new Error('Failed to fetch');
+        const response = await fetch(`${API_URL}/accounts`, {
+            credentials: 'include'
+        });
+        if (!response.ok) {
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
+            throw new Error('Failed to fetch accounts');
+        }
         allAccounts = await response.json();
         renderAccounts(allAccounts);
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Error loading accounts:', error);
         showNotification('❌ Gagal memuat akun', 'error');
+        // Tampilkan tabel kosong
+        renderAccounts([]);
     }
 }
 
 async function loadStatistics() {
     try {
-        const response = await fetch(`${API_URL}/statistics`);
-        if (!response.ok) throw new Error('Failed to fetch');
+        const response = await fetch(`${API_URL}/statistics`, {
+            credentials: 'include'
+        });
+        if (!response.ok) {
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
+            throw new Error('Failed to fetch statistics');
+        }
         const stats = await response.json();
         document.getElementById('total').textContent = stats.total || 0;
         document.getElementById('available_3d').textContent = stats.available_3d || 0;
@@ -62,13 +100,18 @@ async function loadStatistics() {
         document.getElementById('sold').textContent = stats.sold || 0;
         document.getElementById('personal').textContent = stats.personal || 0;
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Error loading statistics:', error);
+        // Set ke 0
+        ['total', 'available_3d', 'available_7d', 'sold', 'personal'].forEach(id => {
+            document.getElementById(id).textContent = '0';
+        });
     }
 }
 
 // ============ RENDER ACCOUNTS ============
 function renderAccounts(accounts) {
     const tbody = document.getElementById('accountTableBody');
+    if (!tbody) return;
     
     if (!accounts || accounts.length === 0) {
         tbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-gray-500">Belum ada akun</td></tr>`;
@@ -114,17 +157,21 @@ function filterAccounts() {
 // ============ TOGGLE FORM ============
 function toggleForm(form) {
     ['add', 'bulk', 'ambil', 'status'].forEach(f => {
-        document.getElementById(f + 'Form').classList.add('hidden');
+        const el = document.getElementById(f + 'Form');
+        if (el) el.classList.add('hidden');
     });
     if (form) {
-        document.getElementById(form + 'Form').classList.remove('hidden');
-        if (form === 'ambil') loadAmbilList();
-        if (form === 'status') loadStatusList();
+        const el = document.getElementById(form + 'Form');
+        if (el) {
+            el.classList.remove('hidden');
+            if (form === 'ambil') loadAmbilList();
+            if (form === 'status') loadStatusList();
+        }
     }
 }
 
 // ============ ADD ACCOUNT ============
-document.getElementById('addAccountForm').addEventListener('submit', async (e) => {
+document.getElementById('addAccountForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = document.getElementById('email').value;
     const username = document.getElementById('username').value;
@@ -140,7 +187,8 @@ document.getElementById('addAccountForm').addEventListener('submit', async (e) =
         const response = await fetch(`${API_URL}/accounts`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, username, password, totp })
+            body: JSON.stringify({ email, username, password, totp }),
+            credentials: 'include'
         });
         if (!response.ok) throw new Error('Gagal menambahkan');
         showNotification('✅ Akun berhasil ditambahkan!', 'success');
@@ -177,7 +225,8 @@ async function submitBulk() {
         const response = await fetch(`${API_URL}/accounts/bulk`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ accounts })
+            body: JSON.stringify({ accounts }),
+            credentials: 'include'
         });
         if (!response.ok) throw new Error('Gagal menambahkan');
         const result = await response.json();
@@ -193,6 +242,8 @@ async function submitBulk() {
 // ============ AMBIL AKUN ============
 function loadAmbilList() {
     const list = document.getElementById('ambilAccountList');
+    if (!list) return;
+    
     const available = allAccounts.filter(a => a.status === 'available' || a.status === 'available_3d');
     if (available.length === 0) {
         list.innerHTML = '<p class="text-gray-500 p-4">Tidak ada akun tersedia</p>';
@@ -260,6 +311,8 @@ async function ambilAkun() {
 // ============ BULK STATUS ============
 function loadStatusList() {
     const list = document.getElementById('statusAccountList');
+    if (!list) return;
+    
     if (allAccounts.length === 0) {
         list.innerHTML = '<p class="text-gray-500 p-4">Belum ada akun</p>';
         return;
@@ -296,7 +349,8 @@ async function updateBulkStatus(status) {
         const response = await fetch(`${API_URL}/accounts/bulk/status`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids, status })
+            body: JSON.stringify({ ids, status }),
+            credentials: 'include'
         });
         if (!response.ok) throw new Error('Gagal update');
         const result = await response.json();
@@ -356,7 +410,8 @@ async function updateAccount(id, data) {
         const response = await fetch(`${API_URL}/accounts/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+            body: JSON.stringify(data),
+            credentials: 'include'
         });
         if (!response.ok) throw new Error('Gagal update');
         showNotification('✅ Akun diupdate!', 'success');
@@ -372,7 +427,8 @@ async function deleteAccount(id) {
     if (!acc || !confirm(`Hapus "${acc.username}"?`)) return;
     try {
         const response = await fetch(`${API_URL}/accounts/${id}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            credentials: 'include'
         });
         if (!response.ok) throw new Error('Gagal hapus');
         showNotification('✅ Akun dihapus!', 'success');
@@ -413,9 +469,53 @@ function refreshData() { loadData(); }
 
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded', async () => {
-    const auth = await checkAuth();
-    if (auth && auth.user) {
-        document.getElementById('userDisplay').textContent = `👤 ${auth.user.username}`;
+    console.log('🚀 Page loaded, checking auth...');
+    
+    try {
+        // Cek auth dulu
+        const auth = await checkAuth();
+        console.log('📡 Auth result:', auth);
+        
+        // Kalo ga authenticated, redirect sudah terjadi di checkAuth
+        if (!auth || !auth.authenticated) {
+            console.log('🔒 Not authenticated, redirecting...');
+            return;
+        }
+        
+        // Kalo authenticated, tampilkan user
+        if (auth.user) {
+            const userDisplay = document.getElementById('userDisplay');
+            if (userDisplay) {
+                userDisplay.textContent = `👤 ${auth.user.username}`;
+            }
+        }
+        
+        // Load data
+        console.log('📊 Loading dashboard data...');
+        await loadData();
+        console.log('✅ Dashboard loaded successfully');
+        
+    } catch (error) {
+        console.error('❌ Fatal error:', error);
+        // Tampilkan pesan error
+        document.body.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:20px;padding:20px;text-align:center;">
+                <h1 style="font-size:24px;color:#1a1a1a;">⚠️ Terjadi Kesalahan</h1>
+                <p style="color:#666;max-width:400px;">${error.message || 'Gagal memuat halaman. Silakan refresh atau coba lagi nanti.'}</p>
+                <button onclick="location.reload()" style="padding:12px 24px;background:#1a1a1a;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;">
+                    <i class="fas fa-sync"></i> Refresh Halaman
+                </button>
+                <button onclick="window.location.href='/login.html'" style="padding:12px 24px;background:transparent;color:#1a1a1a;border:1px solid #ccc;border-radius:8px;cursor:pointer;font-weight:600;">
+                    <i class="fas fa-sign-in-alt"></i> Ke Halaman Login
+                </button>
+            </div>
+        `;
     }
-    loadData();
+});
+
+// ============ ESC KEY ============
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeModal();
+    }
 });
