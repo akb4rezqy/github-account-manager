@@ -138,6 +138,8 @@
             errorMessage.classList.remove('show');
             
             try {
+                console.log('📤 Sending login request...');
+                
                 const response = await fetch('/api/login', {
                     method: 'POST',
                     headers: { 
@@ -148,9 +150,25 @@
                     body: JSON.stringify({ username, password })
                 });
                 
-                const data = await response.json();
+                console.log('📡 Response status:', response.status);
+                
+                // ✅ Cek response type
+                const contentType = response.headers.get('content-type');
+                console.log('📡 Content-Type:', contentType);
+                
+                let data;
+                if (contentType && contentType.includes('application/json')) {
+                    data = await response.json();
+                    console.log('📡 Response data:', data);
+                } else {
+                    // ❌ Bukan JSON - coba baca sebagai text
+                    const text = await response.text();
+                    console.log('📡 Response text:', text);
+                    throw new Error('Server mengirim response tidak valid: ' + text.substring(0, 100));
+                }
                 
                 if (response.ok && data.success) {
+                    console.log('✅ Login successful, redirecting...');
                     window.location.href = '/';
                 } else {
                     errorText.textContent = data.error || 'Username atau password salah';
@@ -160,8 +178,8 @@
                     buttonSpinner.style.display = 'none';
                 }
             } catch (error) {
-                console.error('Login error:', error);
-                errorText.textContent = 'Terjadi kesalahan, coba lagi';
+                console.error('❌ Login error:', error);
+                errorText.textContent = 'Terjadi kesalahan: ' + error.message;
                 errorMessage.classList.add('show');
                 button.disabled = false;
                 buttonText.textContent = 'Masuk';
