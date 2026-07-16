@@ -1,1 +1,75 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Stock Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+    <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
+        <div class="text-center mb-6">
+            <i class="fas fa-lock text-5xl text-gray-800 mb-4"></i>
+            <h1 class="text-2xl font-bold">Stock Manager</h1>
+            <p class="text-gray-500">Masuk untuk mengakses dashboard</p>
+        </div>
+        
+        <div id="errorMessage" class="hidden bg-red-100 text-red-700 p-3 rounded-lg mb-4">
+            <i class="fas fa-exclamation-circle"></i>
+            <span id="errorText">Username atau password salah</span>
+        </div>
+        
+        <form id="loginForm">
+            <input type="text" id="username" placeholder="Username" 
+                   class="w-full px-4 py-3 border rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-gray-400" required>
+            <input type="password" id="password" placeholder="Password" 
+                   class="w-full px-4 py-3 border rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-gray-400" required>
+            <button type="submit" id="loginButton" 
+                    class="w-full bg-gray-900 hover:bg-gray-800 text-white py-3 rounded-lg font-semibold transition">
+                Masuk
+            </button>
+        </form>
+    </div>
 
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const button = document.getElementById('loginButton');
+            const errorDiv = document.getElementById('errorMessage');
+            const errorText = document.getElementById('errorText');
+            
+            button.disabled = true;
+            button.textContent = 'Memproses...';
+            errorDiv.classList.add('hidden');
+            
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    window.location.href = '/';
+                } else {
+                    errorText.textContent = data.error || 'Username atau password salah';
+                    errorDiv.classList.remove('hidden');
+                    button.disabled = false;
+                    button.textContent = 'Masuk';
+                }
+            } catch (error) {
+                errorText.textContent = 'Terjadi kesalahan, coba lagi';
+                errorDiv.classList.remove('hidden');
+                button.disabled = false;
+                button.textContent = 'Masuk';
+            }
+        });
+    </script>
+</body>
+</html>
