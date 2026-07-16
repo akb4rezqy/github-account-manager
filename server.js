@@ -3,7 +3,6 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 const session = require('express-session');
-const MongoStore = require('connect-mongo');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const bcrypt = require('bcryptjs');
@@ -50,21 +49,13 @@ app.use((req, res, next) => {
     next();
 });
 
-// ============ SESSION WITH MONGOSTORE ============
+// ============ SESSION - MEMORY STORE (SEDERHANA) ============
 app.use(session({
     secret: process.env.SESSION_SECRET || 'your-secret-key-min-32-chars',
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({
-        mongoUrl: process.env.MONGODB_URI,
-        touchAfter: 24 * 3600,
-        crypto: {
-            secret: process.env.SESSION_SECRET || 'your-secret-key-min-32-chars'
-        },
-        collectionName: 'sessions'
-    }),
     cookie: {
-        secure: process.env.NODE_ENV === 'production',
+        secure: false, // SET false dulu untuk testing
         httpOnly: true,
         sameSite: 'lax',
         maxAge: 7 * 24 * 60 * 60 * 1000,
@@ -76,9 +67,7 @@ app.use(session({
 
 // ============ MIDDLEWARE ============
 app.use(cors({
-    origin: process.env.NODE_ENV === 'production' 
-        ? ['https://your-domain.vercel.app', 'https://webstokaccghakbzq07.vercel.app'] 
-        : ['http://localhost:3000', 'http://localhost:5173'],
+    origin: '*',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
@@ -138,10 +127,11 @@ app.post('/api/login', loginLimiter, [
         const validPasswordHash = process.env.ADMIN_PASSWORD_HASH;
 
         console.log('🔍 Login attempt:', { username });
+        console.log('🔍 Hash from env:', validPasswordHash ? '✅ ADA' : '❌ TIDAK ADA');
 
         if (!validPasswordHash) {
             console.error('❌ ADMIN_PASSWORD_HASH not set in .env');
-            return res.status(500).json({ error: 'Server configuration error' });
+            return res.status(500).json({ error: 'Server configuration error - Password hash not set' });
         }
 
         if (username !== validUsername) {
@@ -155,7 +145,7 @@ app.post('/api/login', loginLimiter, [
             console.log('🔍 Password valid:', isValidPassword);
         } catch (bcryptError) {
             console.error('❌ Bcrypt error:', bcryptError.message);
-            return res.status(500).json({ error: 'Server configuration error' });
+            return res.status(500).json({ error: 'Server configuration error - Invalid hash format' });
         }
 
         if (!isValidPassword) {
@@ -181,7 +171,7 @@ app.post('/api/login', loginLimiter, [
             
             res.cookie('sessionId', req.sessionID, {
                 httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
+                secure: false,
                 sameSite: 'lax',
                 maxAge: 7 * 24 * 60 * 60 * 1000,
                 path: '/'
@@ -196,7 +186,7 @@ app.post('/api/login', loginLimiter, [
 
     } catch (error) {
         console.error('❌ Login error:', error);
-        res.status(500).json({ error: 'Terjadi kesalahan server' });
+        res.status(500).json({ error: 'Server error: ' + error.message });
     }
 });
 
@@ -479,7 +469,6 @@ mongoose.connect(process.env.MONGODB_URI, {
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 Server running on http://localhost:${PORT}`);
             console.log(`🔐 Login: ${process.env.ADMIN_USERNAME || 'admin'} / password dari .env`);
-            console.log(`🛡️  Security: Helmet, Rate Limit, Session (MongoStore), CSRF Protection`);
         });
     })
     .catch(err => {
