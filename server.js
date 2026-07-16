@@ -48,11 +48,11 @@ app.use(session({
     saveUninitialized: false,
     cookie: {
         secure: process.env.NODE_ENV === 'production',
-        httpOnly: true,  // Mencegah XSS
-        sameSite: 'strict',  // Mencegah CSRF
+        httpOnly: true,
+        sameSite: 'lax',
         maxAge: 24 * 60 * 60 * 1000
     },
-    name: 'sessionId' // Ganti default connect.sid
+    name: 'sessionId'
 }));
 
 // ============ MIDDLEWARE ============
@@ -62,7 +62,7 @@ app.use(cors({
         : ['http://localhost:3000', 'http://localhost:5173'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
 }));
 
 app.use(express.json({ limit: '10mb' }));
@@ -108,23 +108,38 @@ app.post('/api/login', loginLimiter, [
         const validUsername = process.env.ADMIN_USERNAME || 'admin';
         const validPasswordHash = process.env.ADMIN_PASSWORD_HASH;
 
+        // DEBUG LOG
+        console.log('🔍 Login attempt:', { username });
+        console.log('🔍 Hash from env:', validPasswordHash ? '✅ ADA' : '❌ TIDAK ADA');
+
         if (!validPasswordHash) {
-            console.error('❌ Password hash not set in .env');
-            return res.status(500).json({ error: 'Server configuration error' });
+            console.error('❌ ADMIN_PASSWORD_HASH not set in .env');
+            return res.status(500).json({ error: 'Server configuration error - Password hash not set' });
         }
 
         // Check username
         if (username !== validUsername) {
+            console.log('❌ Username salah:', username);
             return res.status(401).json({ error: 'Username atau password salah' });
         }
 
         // Check password dengan bcrypt
-        const isValidPassword = await bcrypt.compare(password, validPasswordHash);
+        let isValidPassword = false;
+        try {
+            isValidPassword = await bcrypt.compare(password, validPasswordHash);
+            console.log('🔍 Password valid:', isValidPassword);
+        } catch (bcryptError) {
+            console.error('❌ Bcrypt error:', bcryptError.message);
+            return res.status(500).json({ error: 'Server configuration error - Invalid hash format' });
+        }
+
         if (!isValidPassword) {
+            console.log('❌ Password salah');
             return res.status(401).json({ error: 'Username atau password salah' });
         }
 
-        // Regenerate session untuk prevent session fixation
+        // ✅ LOGIN BERHASIL
+        console.log('✅ Login successful for:', username);
         req.session.regenerate((err) => {
             if (err) {
                 console.error('Session regenerate error:', err);
@@ -136,8 +151,8 @@ app.post('/api/login', loginLimiter, [
         });
 
     } catch (error) {
-        console.error('Login error:', error);
-        res.status(500).json({ error: 'Terjadi kesalahan server' });
+        console.error('❌ Login error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server: ' + error.message });
     }
 });
 
@@ -409,11 +424,13 @@ mongoose.connect(process.env.MONGODB_URI, {
         console.log('✅ Connected to MongoDB Atlas');
         console.log(`📊 Database: ${mongoose.connection.db.databaseName}`);
 
-        // Generate password hash jika belum ada
+        // Cek password hash
         if (!process.env.ADMIN_PASSWORD_HASH) {
             console.log('\n⚠️  PASSWORD HASH BELUM DISET!');
             console.log('Generate dengan: node -e "console.log(require(\'bcryptjs\').hashSync(\'rahasia123\', 10))"');
             console.log('Lalu tambahkan ke .env: ADMIN_PASSWORD_HASH=hasil_hash\n');
+        } else {
+            console.log('✅ Password hash ditemukan di .env');
         }
 
         app.listen(PORT, '0.0.0.0', () => {
@@ -424,6 +441,7 @@ mongoose.connect(process.env.MONGODB_URI, {
     })
     .catch(err => {
         console.error('❌ MongoDB connection error:', err);
+        console.log('\n⚠️  Server tetap berjalan tanpa database...');
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 Server running (without DB) on http://localhost:${PORT}`);
         });
