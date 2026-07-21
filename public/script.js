@@ -2,6 +2,15 @@ const API_URL = window.location.origin + '/api';
 let allAccounts = [];
 let selectedAccounts = new Set();
 
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 // ============ LOAD DATA ============
 async function loadData() {
     try {
@@ -54,20 +63,21 @@ function renderAccounts(accounts) {
                            acc.status === 'sold' ? 'Terjual' : 'Pribadi';
         const date = new Date(acc.created_at).toLocaleString('id-ID');
         const days = Math.floor((Date.now() - new Date(acc.created_at)) / (1000 * 60 * 60 * 24));
+        const id = escapeHtml(acc._id);
         
         return `
             <tr class="hover:bg-gray-50">
-                <td class="px-4 py-3"><input type="checkbox" class="account-checkbox" value="${acc._id}" onchange="toggleAccount('${acc._id}')"></td>
-                <td class="px-4 py-3 text-sm">#${acc._id.slice(-6)}</td>
-                <td class="px-4 py-3 font-medium">${acc.username}</td>
-                <td class="px-4 py-3 text-sm">${acc.email || '-'}</td>
-                <td class="px-4 py-3 text-sm">${days} hari</td>
-                <td class="px-4 py-3 text-sm">${date}</td>
-                <td class="px-4 py-3"><span class="status-badge status-gray">${statusLabel}</span></td>
+                <td class="px-4 py-3"><input type="checkbox" class="account-checkbox" value="${id}" onchange="toggleAccount('${id}')"></td>
+                <td class="px-4 py-3 text-sm">#${escapeHtml(String(acc._id).slice(-6))}</td>
+                <td class="px-4 py-3 font-medium">${escapeHtml(acc.username)}</td>
+                <td class="px-4 py-3 text-sm">${escapeHtml(acc.email || '-')}</td>
+                <td class="px-4 py-3 text-sm">${escapeHtml(days)} hari</td>
+                <td class="px-4 py-3 text-sm">${escapeHtml(date)}</td>
+                <td class="px-4 py-3"><span class="status-badge status-gray">${escapeHtml(statusLabel)}</span></td>
                 <td class="px-4 py-3">
-                    <button onclick="showDetail('${acc._id}')" class="btn-action btn-detail">Detail</button>
-                    <button onclick="editAccount('${acc._id}')" class="btn-action btn-edit">Edit</button>
-                    <button onclick="deleteAccount('${acc._id}')" class="btn-action btn-delete">Hapus</button>
+                    <button onclick="showDetail('${id}')" class="btn-action btn-detail">Detail</button>
+                    <button onclick="editAccount('${id}')" class="btn-action btn-edit">Edit</button>
+                    <button onclick="deleteAccount('${id}')" class="btn-action btn-delete">Hapus</button>
                 </td>
             </tr>
         `;
@@ -173,13 +183,14 @@ function loadAmbilList() {
     }
     list.innerHTML = available.map(a => {
         const statusLabel = a.status === 'available' ? 'Tersedia' : '3 Hari';
+        const id = escapeHtml(a._id);
         return `
             <div class="flex items-center gap-3 p-2 border-b hover:bg-gray-50">
-                <input type="checkbox" class="ambil-checkbox" value="${a._id}" onchange="toggleAmbil('${a._id}')">
-                <span class="font-medium">${a.username}</span>
-                <span class="text-sm text-gray-500">${a.email || '-'}</span>
-                <span class="status-badge status-gray">${statusLabel}</span>
-                <span class="text-sm text-gray-400">${Math.floor((Date.now() - new Date(a.created_at)) / (1000 * 60 * 60 * 24))} hari</span>
+                <input type="checkbox" class="ambil-checkbox" value="${id}" onchange="toggleAmbil('${id}')">
+                <span class="font-medium">${escapeHtml(a.username)}</span>
+                <span class="text-sm text-gray-500">${escapeHtml(a.email || '-')}</span>
+                <span class="status-badge status-gray">${escapeHtml(statusLabel)}</span>
+                <span class="text-sm text-gray-400">${escapeHtml(Math.floor((Date.now() - new Date(a.created_at)) / (1000 * 60 * 60 * 24)))} hari</span>
             </div>
         `;
     }).join('');
@@ -241,12 +252,13 @@ function loadStatusList() {
         const statusLabel = a.status === 'available' ? 'Tersedia' :
                            a.status === 'available_3d' ? '3 Hari' :
                            a.status === 'sold' ? 'Terjual' : 'Pribadi';
+        const id = escapeHtml(a._id);
         return `
             <div class="flex items-center gap-3 p-2 border-b hover:bg-gray-50">
-                <input type="checkbox" class="status-checkbox" value="${a._id}" onchange="toggleStatus('${a._id}')">
-                <span class="font-medium">${a.username}</span>
-                <span class="text-sm text-gray-500">${a.email || '-'}</span>
-                <span class="status-badge status-gray">${statusLabel}</span>
+                <input type="checkbox" class="status-checkbox" value="${id}" onchange="toggleStatus('${id}')">
+                <span class="font-medium">${escapeHtml(a.username)}</span>
+                <span class="text-sm text-gray-500">${escapeHtml(a.email || '-')}</span>
+                <span class="status-badge status-gray">${escapeHtml(statusLabel)}</span>
             </div>
         `;
     }).join('');
@@ -293,14 +305,14 @@ function showDetail(id) {
     document.getElementById('modalTitle').textContent = `Detail - ${acc.username}`;
     document.getElementById('modalBody').innerHTML = `
         <div class="space-y-2">
-            <p><strong>ID:</strong> ${acc._id}</p>
-            <p><strong>Username:</strong> ${acc.username}</p>
-            <p><strong>Email:</strong> ${acc.email || '-'}</p>
-            <p><strong>Password:</strong> <code class="bg-gray-100 px-2 py-1 rounded">${acc.password}</code></p>
-            <p><strong>TOTP:</strong> ${acc.totp || '-'}</p>
-            <p><strong>Status:</strong> <span class="status-badge status-gray">${statusLabel}</span></p>
-            <p><strong>Umur:</strong> ${Math.floor((Date.now() - new Date(acc.created_at)) / (1000 * 60 * 60 * 24))} hari</p>
-            <p><strong>Ditambahkan:</strong> ${new Date(acc.created_at).toLocaleString('id-ID')}</p>
+            <p><strong>ID:</strong> ${escapeHtml(acc._id)}</p>
+            <p><strong>Username:</strong> ${escapeHtml(acc.username)}</p>
+            <p><strong>Email:</strong> ${escapeHtml(acc.email || '-')}</p>
+            <p><strong>Password:</strong> <code class="bg-gray-100 px-2 py-1 rounded">${escapeHtml(acc.password)}</code></p>
+            <p><strong>TOTP:</strong> ${escapeHtml(acc.totp || '-')}</p>
+            <p><strong>Status:</strong> <span class="status-badge status-gray">${escapeHtml(statusLabel)}</span></p>
+            <p><strong>Umur:</strong> ${escapeHtml(Math.floor((Date.now() - new Date(acc.created_at)) / (1000 * 60 * 60 * 24)))} hari</p>
+            <p><strong>Ditambahkan:</strong> ${escapeHtml(new Date(acc.created_at).toLocaleString('id-ID'))}</p>
         </div>
     `;
     document.getElementById('accountModal').classList.remove('hidden');
@@ -376,7 +388,7 @@ function showNotification(msg, type = 'info') {
     if (existing) existing.remove();
     const div = document.createElement('div');
     div.className = `notification ${type}`;
-    div.innerHTML = `${msg} <button onclick="this.parentElement.remove()" class="ml-4 text-xl">&times;</button>`;
+    div.innerHTML = `${escapeHtml(msg)} <button onclick="this.parentElement.remove()" class="ml-4 text-xl">&times;</button>`;
     document.body.appendChild(div);
     setTimeout(() => div.remove(), 5000);
 }

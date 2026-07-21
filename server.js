@@ -1,21 +1,54 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const path = require('path');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { createSessionToken, verifySessionToken, parseCookies } = require('./auth');
+const { normalizeAccountInput, toSafeString } = require('./sanitize');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CORS
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com", "https://cdnjs.cloudflare.com"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
+            fontSrc: ["'self'", "https://cdnjs.cloudflare.com", "data:"],
+            imgSrc: ["'self'", "data:"],
+            connectSrc: ["'self'"],
+            frameAncestors: ["'none'"],
+        },
+    },
 }));
+
+app.use(cors({
+    origin(origin, callback) {
+        if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) return callback(null, true);
+        return callback(new Error('Not allowed by CORS'));
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type'],
+    credentials: true,
+}));
+
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Terlalu banyak percobaan login. Coba lagi nanti.' },
+});
 
 // Middleware
 app.use(express.json());
@@ -49,7 +82,7 @@ app.get('/login', (req, res) => {
     return res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', loginLimiter, async (req, res) => {
     if (!sessionSecret || !adminUsername || (!adminPassword && !adminPasswordHash)) {
         return res.status(503).json({ error: 'Login is not configured' });
     }
@@ -165,17 +198,17 @@ app.post('/api/accounts', async (req, res) => {
     try {
         console.log('📝 Received account data:', req.body);
         
-        const { email, username, password, totp } = req.body;
+        const { email, username, password, totp } = normalizeAccountInput(req.body);
         
         if (!username || !password) {
             return res.status(400).json({ error: 'Username dan password wajib diisi' });
         }
 
         const account = new Account({
-            email: email || '',
-            username: username.trim(),
-            password: password.trim(),
-            totp: totp || '',
+            email,
+            username,
+            password,
+            totp,
             created_at: new Date()
         });
 
@@ -200,13 +233,13 @@ app.post('/api/accounts/bulk', async (req, res) => {
 
         const created = [];
         for (const acc of accounts) {
-            const { email, username, password, totp } = acc;
+            const { email, username, password, totp } = normalizeAccountInput(acc);
             if (username && password) {
                 const account = new Account({
-                    email: email || '',
-                    username: username.trim(),
-                    password: password.trim(),
-                    totp: totp || '',
+                    email,
+                    username,
+                    password,
+                    totp,
                     created_at: new Date()
                 });
                 await account.save();
@@ -280,13 +313,13 @@ app.put('/api/accounts/:id/status', async (req, res) => {
 // PUT update data akun
 app.put('/api/accounts/:id', async (req, res) => {
     try {
-        const { email, username, password, totp } = req.body;
+        const normalized = normalizeAccountInput(req.body);
         const updateData = {};
         
-        if (email !== undefined) updateData.email = email;
-        if (username !== undefined) updateData.username = username;
-        if (password !== undefined) updateData.password = password;
-        if (totp !== undefined) updateData.totp = totp;
+        if (req.body.email !== undefined) updateData.email = normalized.email;
+        if (req.body.username !== undefined) updateData.username = normalized.username;
+        if (req.body.password !== undefined) updateData.password = normalized.password;
+        if (req.body.totp !== undefined) updateData.totp = normalized.totp;
 
         const account = await Account.findByIdAndUpdate(
             req.params.id,
