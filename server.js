@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 const { createSessionToken, verifySessionToken, parseCookies } = require('./auth');
 require('dotenv').config();
 
@@ -25,6 +26,7 @@ const COOKIE_NAME = 'stock_session';
 const sessionSecret = process.env.SESSION_SECRET || '';
 const adminUsername = process.env.ADMIN_USERNAME || '';
 const adminPassword = process.env.ADMIN_PASSWORD || '';
+const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH || '';
 
 function constantTimeEquals(left, right) {
     const leftBuffer = Buffer.from(left || '');
@@ -47,14 +49,18 @@ app.get('/login', (req, res) => {
     return res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-app.post('/api/login', (req, res) => {
-    if (!sessionSecret || !adminUsername || !adminPassword) {
+app.post('/api/login', async (req, res) => {
+    if (!sessionSecret || !adminUsername || (!adminPassword && !adminPasswordHash)) {
         return res.status(503).json({ error: 'Login is not configured' });
     }
 
     const username = typeof req.body.username === 'string' ? req.body.username.trim() : '';
     const password = typeof req.body.password === 'string' ? req.body.password : '';
-    if (!constantTimeEquals(username, adminUsername) || !constantTimeEquals(password, adminPassword)) {
+    const passwordMatches = adminPasswordHash
+        ? await bcrypt.compare(password, adminPasswordHash)
+        : constantTimeEquals(password, adminPassword);
+
+    if (!constantTimeEquals(username, adminUsername) || !passwordMatches) {
         return res.status(401).json({ error: 'Username atau password salah' });
     }
 
