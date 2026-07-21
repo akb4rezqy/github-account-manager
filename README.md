@@ -67,4 +67,6 @@ The repository is configured as a Next.js Vercel project. Add the environment va
 
 ## License
 
-Private project unless otherwise specified by the repository owner.
+Licensed under the [MIT License](LICENSE).
+
+Copyright © 2026 [AKBZQ](https://akbzq.dev).
