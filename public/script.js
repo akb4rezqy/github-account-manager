@@ -381,6 +381,15 @@ function showNotification(msg, type = 'info') {
     setTimeout(() => div.remove(), 5000);
 }
 
+// ============ SESSION ============
+async function logout() {
+    try {
+        await fetch(`${API_URL}/logout`, { method: 'POST', credentials: 'include' });
+    } finally {
+        window.location.href = '/login';
+    }
+}
+
 // ============ REFRESH ============
 function refreshData() { loadData(); }
 

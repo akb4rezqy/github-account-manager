@@ -1,0 +1,19 @@
+node_modules/
+.env
+.env.local
+.env.*
+!.env.example
+npm-debug.log*
+.vercel/
+coverage/
+
+# Credentials and generated files
+*.pem
+*.key
+*.log
+
+# OS files
+.DS_Store
+
+# Test artifacts
+test-cookie.txt

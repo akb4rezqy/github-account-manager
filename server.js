@@ -2,6 +2,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+const crypto = require('crypto');
+const { createSessionToken, verifySessionToken, parseCookies } = require('./auth');
 require('dotenv').config();
 
 const app = express();
@@ -17,14 +19,55 @@ app.use(cors({
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
 
-// Route utama
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+const isProduction = process.env.NODE_ENV === 'production';
+const COOKIE_NAME = 'stock_session';
+const sessionSecret = process.env.SESSION_SECRET || '';
+const adminUsername = process.env.ADMIN_USERNAME || '';
+const adminPassword = process.env.ADMIN_PASSWORD || '';
+
+function constantTimeEquals(left, right) {
+    const leftBuffer = Buffer.from(left || '');
+    const rightBuffer = Buffer.from(right || '');
+    return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function getSession(req) {
+    return verifySessionToken(parseCookies(req.headers.cookie)[COOKIE_NAME], sessionSecret);
+}
+
+function requireAuth(req, res, next) {
+    if (getSession(req)) return next();
+    if (req.originalUrl.startsWith('/api/')) return res.status(401).json({ error: 'Unauthorized' });
+    return res.redirect('/login');
+}
+
+app.get('/login', (req, res) => {
+    if (getSession(req)) return res.redirect('/');
+    return res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-// Health check
+app.post('/api/login', (req, res) => {
+    if (!sessionSecret || !adminUsername || !adminPassword) {
+        return res.status(503).json({ error: 'Login is not configured' });
+    }
+
+    const username = typeof req.body.username === 'string' ? req.body.username.trim() : '';
+    const password = typeof req.body.password === 'string' ? req.body.password : '';
+    if (!constantTimeEquals(username, adminUsername) || !constantTimeEquals(password, adminPassword)) {
+        return res.status(401).json({ error: 'Username atau password salah' });
+    }
+
+    const token = createSessionToken(adminUsername, sessionSecret);
+    res.setHeader('Set-Cookie', `${COOKIE_NAME}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200${isProduction ? '; Secure' : ''}`);
+    return res.json({ success: true });
+});
+
+app.post('/api/logout', (req, res) => {
+    res.setHeader('Set-Cookie', `${COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${isProduction ? '; Secure' : ''}`);
+    return res.json({ success: true });
+});
+
 app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'ok', 
@@ -33,6 +76,16 @@ app.get('/api/health', (req, res) => {
         mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
     });
 });
+
+// All account data APIs require an authenticated session.
+app.use('/api', requireAuth);
+
+app.get(['/', '/index.html'], requireAuth, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Assets remain public; sensitive account data is protected by the API guard above.
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 // ============ MONGODB SCHEMA ============
 const accountSchema = new mongoose.Schema({
