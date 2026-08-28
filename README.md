@@ -24,7 +24,7 @@ Secure account stock dashboard built with **native HTML, CSS, and JavaScript** �
 
 ## Environment
 
-Copy `.env.examplee` to `.env` and fill in private values:
+Copy `.env.example` to `.env` and fill in private values:
 
 ```env
 MONGODB_URI="mongodb+srv://..."
@@ -50,9 +50,16 @@ Open `http://localhost:3000`.
 npm test
 ```
 
-## Deployment
+The same API logic powers two entry points:
 
-Runs on any Node.js 18+ host (VPS, Railway, Render, Fly.io, dll):
+- `server.js` — plain Node.js http server (self-hosting: VPS, Railway, Render, Fly.io, dll.)
+- `api/*.js` — Vercel serverless functions (`/api/*` endpoints)
+
+Static files live in `public/`, which both setups serve at the root.
+
+### Self-hosting (VPS / PaaS)
+
+Runs on any Node.js 18+ host:
 
 ```bash
 npm install --omit=dev
@@ -60,6 +67,18 @@ npm start
 ```
 
 Set `PORT` (default `3000`) and the environment variables above. Put the process behind a reverse proxy with HTTPS (nginx/Caddy) for production — the session cookie is automatically marked `Secure` when `x-forwarded-proto: https` is present.
+
+### Vercel (serverless)
+
+1. Push this repo to GitHub and import it in the Vercel dashboard (Framework preset: **Other**).
+2. Set the environment variables in **Project → Settings → Environment Variables**:
+   - `MONGODB_URI`
+   - `ADMIN_USERNAME`
+   - `ADMIN_PASSWORD` or `ADMIN_PASSWORD_HASH`
+   - `SESSION_SECRET`
+3. Deploy. The `api/` folder becomes the `/api/*` endpoints and `public/` is served as static assets — no build step, no `server.js` needed.
+
+Note: `server.js` is ignored on Vercel; only the serverless functions run there. The MongoDB connection and login rate-limit state are cached per serverless instance, which is fine for a small admin dashboard.
 
 ## Security
 
