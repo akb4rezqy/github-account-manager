@@ -72,4 +72,4 @@ Set `PORT` (default `3000`) and the environment variables above. Put the process
 
 Licensed under the [MIT License](LICENSE).
 
-Copyright © 2026 [AKBZQ](https://akbzq.dev).
+Copyright © 2026 [AKBZQ](https://akbzq.me).
