@@ -1,6 +1,6 @@
 # Stock Manager
 
-Secure account stock dashboard built with Next.js App Router, TypeScript, MongoDB, and shadcn-style React components.
+Secure account stock dashboard built with **native HTML, CSS, and JavaScript** — no framework, no build step — plus a small pure Node.js server backed by MongoDB.
 
 ## Features
 
@@ -12,21 +12,19 @@ Secure account stock dashboard built with Next.js App Router, TypeScript, MongoD
 - Bulk account import
 - Bulk status updates
 - Copy/download selected available accounts and mark them sold
-- Responsive shadcn-style cards, dialogs, buttons, inputs, badges, and tables
+- Responsive native cards, dialogs, buttons, inputs, badges, and tables
 - Login rate limiting and server-side input normalization
 
 ## Stack
 
-- Next.js 16
-- React 19 + TypeScript/TSX
-- Tailwind CSS 4
-- Radix UI primitives
+- Frontend: HTML5 + CSS + vanilla JavaScript (tanpa framework, tanpa build step)
+- Backend: Node.js `http` murni (tanpa framework)
 - Mongoose + MongoDB Atlas
 - bcrypt password hashes
 
 ## Environment
 
-Copy `.env.example` to `.env` and fill in private values:
+Copy `.env.examplee` to `.env` and fill in private values:
 
 ```env
 MONGODB_URI="mongodb+srv://..."
@@ -41,7 +39,7 @@ You may use `ADMIN_PASSWORD` instead of `ADMIN_PASSWORD_HASH` for local-only set
 
 ```bash
 npm install
-npm run dev
+npm start
 ```
 
 Open `http://localhost:3000`.
@@ -50,13 +48,18 @@ Open `http://localhost:3000`.
 
 ```bash
 npm test
-npm run build
-npm audit --omit=dev
 ```
 
 ## Deployment
 
-The repository is configured as a Next.js Vercel project. Add the environment variables above in Vercel, then deploy the `main` branch.
+Runs on any Node.js 18+ host (VPS, Railway, Render, Fly.io, dll):
+
+```bash
+npm install --omit=dev
+npm start
+```
+
+Set `PORT` (default `3000`) and the environment variables above. Put the process behind a reverse proxy with HTTPS (nginx/Caddy) for production — the session cookie is automatically marked `Secure` when `x-forwarded-proto: https` is present.
 
 ## Security
 

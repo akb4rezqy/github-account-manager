@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stock Manager</title>
+  <meta name="description" content="Secure account stock management dashboard">
+  <link rel="preload" href="/fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+  <!-- ============ LOGIN VIEW ============ -->
+  <main id="login-view" class="login-screen" hidden>
+    <div class="login-mesh"></div>
+    <section class="card login-card">
+      <div class="login-head">
+        <div class="icon-circle" data-icon="lock" data-icon-size="22"></div>
+        <h1>Stock Manager</h1>
+        <p>Masuk untuk mengakses dashboard</p>
+      </div>
+      <form id="login-form">
+        <input class="input" name="username" placeholder="Username" autocomplete="username" required>
+        <input class="input" name="password" type="password" placeholder="Password" autocomplete="current-password" required>
+        <p id="login-error" class="login-error" hidden></p>
+        <button class="btn btn-primary btn-block" type="submit" id="login-button">Masuk</button>
+      </form>
+    </section>
+  </main>
+
+  <!-- ============ DASHBOARD VIEW ============ -->
+  <main id="dashboard-view" class="dashboard" hidden>
+    <div class="dashboard-inner">
+
+      <header class="topbar">
+        <div class="topbar-brand">
+          <span class="topbar-logo" data-icon="github" data-icon-size="30"></span>
+          <div>
+            <h1>Stock Manager</h1>
+            <p>Signed in as <span id="session-username"></span></p>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn btn-on-dark" id="refresh-button" data-icon="refresh">Refresh</button>
+          <button class="btn btn-on-dark" id="logout-button" data-icon="logout">Logout</button>
+        </div>
+      </header>
+
+      <div id="notice" class="notice" hidden>
+        <span id="notice-text"></span>
+        <button id="notice-close" type="button" title="Tutup">&times;</button>
+      </div>
+
+      <section id="stat-grid" class="stat-grid"></section>
+
+      <div class="toolbar">
+        <button class="btn btn-primary" id="add-button" data-icon="plus">Tambah Akun</button>
+        <button class="btn btn-secondary" id="bulk-button" data-icon="database">Bulk Add</button>
+        <button class="btn btn-secondary" id="take-button" data-icon="download">Ambil Akun</button>
+        <span class="toolbar-spacer"></span>
+        <div id="status-buttons" class="status-buttons"></div>
+      </div>
+
+      <section class="card">
+        <div class="table-head">
+          <div>
+            <h2>Daftar Akun</h2>
+            <p class="table-sub"><span id="selected-count">0</span> dipilih &middot; <span id="shown-count">0</span> ditampilkan</p>
+          </div>
+          <div class="table-tools">
+            <div class="search-wrap">
+              <span class="search-icon" data-icon="search"></span>
+              <input class="input search-input" id="search-input" placeholder="Cari akun...">
+            </div>
+            <select class="input select" id="filter-select">
+              <option value="all">Semua status</option>
+            </select>
+          </div>
+        </div>
+        <p id="loading-text" class="loading" hidden></p>
+        <div class="table-skeleton" id="table-skeleton">
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+        </div>
+        <div class="table-wrap" id="table-wrap" hidden>
+          <table class="table">
+            <thead>
+              <tr>
+                <th class="col-check"><input type="checkbox" id="select-all" title="Pilih semua"></th>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Umur</th>
+                <th>Status</th>
+                <th class="col-actions">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- ============ DIALOG: TAMBAH / EDIT ============ -->
+  <div class="overlay" id="account-dialog" hidden>
+    <div class="dialog" role="dialog" aria-modal="true">
+      <h3 id="account-dialog-title">Tambah Akun</h3>
+      <p class="dialog-desc">Isi credential akun dan simpan ke stock.</p>
+      <form class="dialog-body" id="account-form">
+        <input class="input" id="field-email" placeholder="Email (opsional)" autocomplete="off">
+        <input class="input" id="field-username" placeholder="Username" autocomplete="off">
+        <input class="input" id="field-password" placeholder="Password" autocomplete="off">
+        <input class="input" id="field-totp" placeholder="TOTP (opsional)" autocomplete="off">
+        <button class="btn btn-primary btn-block" type="submit" id="save-account-button">Simpan</button>
+      </form>
+      <button class="dialog-close" type="button" data-close="account-dialog" title="Tutup">&times;</button>
+    </div>
+  </div>
+
+  <!-- ============ DIALOG: BULK ADD ============ -->
+  <div class="overlay" id="bulk-dialog" hidden>
+    <div class="dialog" role="dialog" aria-modal="true">
+      <h3>Bulk Add</h3>
+      <p class="dialog-desc">Format: email:username:password:totp atau username:password:totp.</p>
+      <div class="dialog-body">
+        <textarea class="textarea" id="bulk-textarea" rows="10" placeholder="email@example.com:username:password:totp"></textarea>
+        <button class="btn btn-primary btn-block" type="button" id="bulk-submit-button">Tambahkan Semua</button>
+      </div>
+      <button class="dialog-close" type="button" data-close="bulk-dialog" title="Tutup">&times;</button>
+    </div>
+  </div>
+
+  <!-- ============ DIALOG: DETAIL ============ -->
+  <div class="overlay" id="detail-dialog" hidden>
+    <div class="dialog" role="dialog" aria-modal="true">
+      <h3>Detail Akun</h3>
+      <p class="dialog-desc">Credential lengkap akun.</p>
+      <div class="dialog-body" id="detail-body"></div>
+      <button class="dialog-close" type="button" data-close="detail-dialog" title="Tutup">&times;</button>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

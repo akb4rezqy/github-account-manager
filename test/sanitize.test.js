@@ -1,6 +1,6 @@
-import { test } from "node:test";
-import { strict as assert } from "node:assert";
-import { normalizeAccountInput } from "../lib/sanitize.ts";
+const { test } = require("node:test");
+const { strict: assert } = require("node:assert");
+const { normalizeAccountInput } = require("../lib/sanitize");
 
 test("normalizes account input", () => {
   assert.deepEqual(

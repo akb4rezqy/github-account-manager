@@ -1,6 +1,6 @@
-import { test } from "node:test";
-import { strict as assert } from "node:assert";
-import { createSessionToken, verifySessionToken } from "../lib/session.ts";
+const { test } = require("node:test");
+const { strict: assert } = require("node:assert");
+const { createSessionToken, verifySessionToken } = require("../lib/session");
 
 test("creates and verifies a signed session token", () => {
   const token = createSessionToken("admin", "test-secret", 60);
