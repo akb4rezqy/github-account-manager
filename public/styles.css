@@ -179,6 +179,18 @@ input[type="checkbox"] { accent-color: var(--primary); width: 16px; height: 16px
   box-shadow: var(--shadow-2);
 }
 
+.icon-circle {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 14px;
+  border-radius: 12px;
+  background: var(--primary-soft);
+  color: var(--on-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .login-head { margin-bottom: 24px; }
 .login-head h1 {
   font-size: 32px;
@@ -339,7 +351,7 @@ input[type="checkbox"] { accent-color: var(--primary); width: 16px; height: 16px
   padding: 10px 24px;
   border-bottom: 1px solid var(--hairline);
 }
-.table td { padding: 12px 24px; border-bottom: 1px solid var(--hairline); color: var(--ink-secondary); }
+.table td { padding: 12px 24px; border-bottom: 1px solid var(--hairline); color: var(--ink-secondary); overflow-wrap: break-word; }
 .table tbody tr:last-child td { border-bottom: 0; }
 .table tbody tr:hover { background: var(--canvas-soft); }
 .cell-strong { color: var(--ink); font-weight: 400; }
@@ -366,7 +378,14 @@ input[type="checkbox"] { accent-color: var(--primary); width: 16px; height: 16px
 .tag[data-status="sold"] { background: rgba(234, 34, 97, .1); color: var(--ruby-deep); }
 .tag[data-status="personal"] { background: #eef2f7; color: var(--ink-mute); }
 
-/* Skeleton loading */
+/* Loading & skeleton */
+.loading {
+  text-align: center;
+  color: var(--ink-mute);
+  padding: 40px 24px;
+  font-size: 14px;
+}
+
 .table-skeleton { padding: 8px 24px 24px; display: grid; gap: 14px; }
 .skeleton-row {
   height: 20px;
@@ -444,14 +463,47 @@ input[type="checkbox"] { accent-color: var(--primary); width: 16px; height: 16px
   color: var(--ink);
 }
 
-/* Responsive */
+/* ============ Responsive ============ */
+
+/* Layar sedang: sembunyikan kolom Email agar tabel muat */
+@media (max-width: 900px) {
+  .table th:nth-child(3), .table td:nth-child(3) { display: none; }
+}
+
 @media (max-width: 640px) {
   .dashboard { padding: 16px 12px; }
   .dashboard-inner { gap: 16px; }
+
+  /* Topbar: susun vertikal, tombol melebar */
   .topbar { flex-direction: column; align-items: flex-start; padding: 20px; }
+  .topbar-actions { width: 100%; }
+  .topbar-actions .btn { flex: 1; }
+
+  /* Statistik lebih ringkas */
+  .stat-grid { gap: 10px; }
+  .stat-card { padding: 14px; gap: 10px; }
+  .stat-chip { width: 36px; height: 36px; }
+  .stat-value { font-size: 22px; }
+
+  /* Toolbar aksi: tombol penuh selebar layar */
+  .toolbar { flex-direction: column; align-items: stretch; }
+  .toolbar-spacer { display: none; }
+  .toolbar > .btn { width: 100%; }
+  .status-buttons { width: 100%; }
+
+  /* Head tabel: pencarian & filter penuh */
   .table-head, .table th, .table td { padding-left: 16px; padding-right: 16px; }
   .table-tools { width: 100%; }
   .search-wrap { flex: 1 1 100%; }
+  .table-tools select { width: 100%; }
+
+  /* Ponsel: sembunyikan kolom Email & Umur (tetap bisa dilihat via Detail) */
+  .table th:nth-child(4), .table td:nth-child(4) { display: none; }
+
+  /* Dialog & login lebih ringkas */
+  .dialog { padding: 20px; }
+  .login-card { padding: 24px; }
+  .login-head h1 { font-size: 28px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
