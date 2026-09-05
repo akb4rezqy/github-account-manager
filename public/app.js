@@ -311,7 +311,8 @@ async function handleLogin(event) {
   errorEl.hidden = true;
   button.disabled = true;
   button.textContent = "Memproses...";
-  const form = new FormData(event.currentTarget);
+  const formEl = event.currentTarget;
+  const form = new FormData(formEl);
   try {
     const response = await fetch("/api/login", {
       method: "POST",
@@ -320,7 +321,7 @@ async function handleLogin(event) {
     });
     const data = await response.json().catch(() => ({}));
     if (response.ok) {
-      event.currentTarget.reset();
+      formEl.reset();
       showDashboard(data.username || form.get("username") || "");
     } else {
       errorEl.textContent = data.error || "Login gagal";

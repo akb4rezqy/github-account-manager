@@ -20,9 +20,9 @@
         <p>Masuk untuk mengakses dashboard</p>
       </div>
       <form id="login-form">
-        <input class="input" name="username" placeholder="Username" autocomplete="username" required>
-        <input class="input" name="password" type="password" placeholder="Password" autocomplete="current-password" required>
-        <p id="login-error" class="login-error" hidden></p>
+        <label class="form-field">Username<input class="input" name="username" placeholder="Username" autocomplete="username" required></label>
+        <label class="form-field">Password<input class="input" name="password" type="password" placeholder="Password" autocomplete="current-password" required></label>
+        <p id="login-error" class="login-error" role="alert" hidden></p>
         <button class="btn btn-primary btn-block" type="submit" id="login-button">Masuk</button>
       </form>
     </section>
@@ -70,9 +70,9 @@
           <div class="table-tools">
             <div class="search-wrap">
               <span class="search-icon" data-icon="search"></span>
-              <input class="input search-input" id="search-input" placeholder="Cari akun...">
+              <input class="input search-input" id="search-input" placeholder="Cari akun..." aria-label="Cari akun">
             </div>
-            <select class="input select" id="filter-select">
+            <select class="input select" id="filter-select" aria-label="Filter status akun">
               <option value="all">Semua status</option>
             </select>
           </div>
@@ -86,7 +86,7 @@
           <div class="skeleton-row"></div>
           <div class="skeleton-row"></div>
         </div>
-        <div class="table-wrap" id="table-wrap" hidden>
+        <div class="table-wrap" id="table-wrap" role="region" aria-label="Daftar akun, geser horizontal untuk melihat semua kolom" tabindex="0" hidden>
           <table class="table">
             <thead>
               <tr>
@@ -108,14 +108,14 @@
 
   <!-- ============ DIALOG: TAMBAH / EDIT ============ -->
   <div class="overlay" id="account-dialog" hidden>
-    <div class="dialog" role="dialog" aria-modal="true">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="account-dialog-title">
       <h3 id="account-dialog-title">Tambah Akun</h3>
       <p class="dialog-desc">Isi credential akun dan simpan ke stock.</p>
       <form class="dialog-body" id="account-form">
-        <input class="input" id="field-email" placeholder="Email (opsional)" autocomplete="off">
-        <input class="input" id="field-username" placeholder="Username" autocomplete="off">
-        <input class="input" id="field-password" placeholder="Password" autocomplete="off">
-        <input class="input" id="field-totp" placeholder="TOTP (opsional)" autocomplete="off">
+        <label class="form-field">Email (opsional)<input class="input" id="field-email" placeholder="Email (opsional)" autocomplete="off"></label>
+        <label class="form-field">Username<input class="input" id="field-username" placeholder="Username" autocomplete="off"></label>
+        <label class="form-field">Password<input class="input" id="field-password" placeholder="Password" autocomplete="off"></label>
+        <label class="form-field">TOTP (opsional)<input class="input" id="field-totp" placeholder="TOTP (opsional)" autocomplete="off"></label>
         <button class="btn btn-primary btn-block" type="submit" id="save-account-button">Simpan</button>
       </form>
       <button class="dialog-close" type="button" data-close="account-dialog" title="Tutup">&times;</button>
@@ -124,11 +124,11 @@
 
   <!-- ============ DIALOG: BULK ADD ============ -->
   <div class="overlay" id="bulk-dialog" hidden>
-    <div class="dialog" role="dialog" aria-modal="true">
-      <h3>Bulk Add</h3>
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="bulk-dialog-title">
+      <h3 id="bulk-dialog-title">Bulk Add</h3>
       <p class="dialog-desc">Format: email:username:password:totp atau username:password:totp.</p>
       <div class="dialog-body">
-        <textarea class="textarea" id="bulk-textarea" rows="10" placeholder="email@example.com:username:password:totp"></textarea>
+        <label class="form-field">Daftar akun<textarea class="textarea" id="bulk-textarea" rows="10" placeholder="email@example.com:username:password:totp"></textarea></label>
         <button class="btn btn-primary btn-block" type="button" id="bulk-submit-button">Tambahkan Semua</button>
       </div>
       <button class="dialog-close" type="button" data-close="bulk-dialog" title="Tutup">&times;</button>
@@ -137,8 +137,8 @@
 
   <!-- ============ DIALOG: DETAIL ============ -->
   <div class="overlay" id="detail-dialog" hidden>
-    <div class="dialog" role="dialog" aria-modal="true">
-      <h3>Detail Akun</h3>
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="detail-dialog-title">
+      <h3 id="detail-dialog-title">Detail Akun</h3>
       <p class="dialog-desc">Credential lengkap akun.</p>
       <div class="dialog-body" id="detail-body"></div>
       <button class="dialog-close" type="button" data-close="detail-dialog" title="Tutup">&times;</button>
