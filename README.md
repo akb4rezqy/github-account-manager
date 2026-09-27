@@ -9,6 +9,9 @@ Secure account stock dashboard built with **native HTML, CSS, and JavaScript** �
 - Dashboard statistics
 - Search and status filtering
 - Add, edit, inspect, and delete accounts
+- Account folders: group accounts by package/source with chips navigation, per-folder statistics, bulk move, rename, and delete (accounts are detached, never deleted)
+- Soft delete with Trash view: restore or purge permanently (auto-purge after 30 days)
+- Live TOTP codes (RFC 6238, 6 digit, refresh every 30s) derived from the stored secret — the 16-digit secret is never modified
 - Bulk account import
 - Bulk status updates
 - Copy/download selected available accounts and mark them sold
@@ -56,6 +59,34 @@ The same API logic powers two entry points:
 - `api/*.js` — Vercel serverless functions (`/api/*` endpoints)
 
 Static files live in `public/`, which both setups serve at the root.
+
+### Trash & restore endpoints
+
+Deleting an account moves it to Trash instead of removing the document:
+
+| Method | Endpoint | Effect |
+| --- | --- | --- |
+| `DELETE` | `/api/accounts/:id` | Soft delete (sets `deleted_at`) |
+| `DELETE` | `/api/accounts/:id?permanent=1` | Delete permanently |
+| `POST` | `/api/accounts/:id/restore` | Restore from Trash |
+| `DELETE` | `/api/accounts/trash` | Empty the Trash |
+| `GET` | `/api/accounts?trash=1` | List trashed accounts (purges entries older than 30 days) |
+
+Trashed accounts are excluded from listings, statistics, edits, and status updates.
+
+### Folder endpoints
+
+| Method | Endpoint | Effect |
+| --- | --- | --- |
+| `GET` | `/api/folders` | List folders with live-account counts + `unassigned` |
+| `POST` | `/api/folders` | Create folder (`409` on duplicate name) |
+| `PUT` | `/api/folders/:id` | Rename folder (`409` on duplicate name) |
+| `DELETE` | `/api/folders/:id` | Delete folder and detach its accounts (`detached`) |
+| `GET` | `/api/accounts?folder=<id\|none>` | Accounts of one folder (`none` = unassigned) |
+| `GET` | `/api/statistics?folder=<id\|none>` | Statistics scoped to a folder (Trash card stays global) |
+| `PUT` | `/api/accounts/bulk/folder` | Move selected accounts (`{ ids, folder_id }`) |
+
+Bulk import (`POST /api/accounts/bulk`) accepts an optional `folder_id` applied to every imported account.
 
 ### Self-hosting (VPS / PaaS)
 

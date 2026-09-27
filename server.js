@@ -13,9 +13,10 @@
 const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
-const { handleApiRequest, sendJson } = require("./lib/api-handler");
 
-/* ---------- Minimal .env loader (no dependencies) ---------- */
+/* ---------- Minimal .env loader (no dependencies) ----------
+ * Harus dijalankan SEBELUM require("./lib/api-handler"): lib/db.js membaca
+ * process.env.MONGODB_URI saat module load. */
 for (const file of [".env", ".env.local"]) {
   const envPath = path.join(__dirname, file);
   if (!fs.existsSync(envPath)) continue;
@@ -29,6 +30,8 @@ for (const file of [".env", ".env.local"]) {
     if (process.env[match[1]] === undefined) process.env[match[1]] = value;
   }
 }
+
+const { handleApiRequest, sendJson } = require("./lib/api-handler");
 
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || "0.0.0.0";

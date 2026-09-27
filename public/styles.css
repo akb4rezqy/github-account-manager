@@ -323,6 +323,59 @@ input[type="checkbox"] { accent-color: var(--primary); width: 16px; height: 16px
 .status-buttons .btn { background: var(--canvas); border-color: var(--hairline); color: var(--ink-secondary); }
 .status-buttons .btn:hover { border-color: var(--primary); color: var(--primary); }
 
+/* ============ Folder chips ============ */
+.move-folder { min-width: 172px; }
+.folder-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.folder-chips {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+.folder-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 6px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-pill);
+  background: var(--canvas);
+  color: var(--ink-secondary);
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.folder-chip:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.folder-chip:disabled { opacity: .5; cursor: not-allowed; }
+.folder-chip.is-active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
+}
+.folder-chip.is-active:hover:not(:disabled) { background: var(--primary-deep); color: var(--on-primary); }
+.folder-chip-add { border-style: dashed; color: var(--ink-mute); }
+.folder-count {
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  background: var(--canvas-soft);
+  color: var(--ink-mute);
+  font-size: 11px;
+}
+.folder-chip.is-active .folder-count { background: rgba(255, 255, 255, .22); color: var(--on-primary); }
+.folder-actions { display: flex; gap: 6px; flex: none; }
+
 /* Tabel */
 .table-head {
   display: flex;
@@ -390,6 +443,11 @@ input[type="checkbox"] { accent-color: var(--primary); width: 16px; height: 16px
 .tag[data-status="available_3d"] { background: var(--canvas-cream); color: var(--lemon-deep); }
 .tag[data-status="sold"] { background: rgba(234, 34, 97, .1); color: var(--ruby-deep); }
 .tag[data-status="personal"] { background: #eef2f7; color: var(--ink-mute); }
+.tag[data-status="deleted"] {
+  background: rgba(234, 34, 97, .08);
+  color: var(--ruby-deep);
+  border: 1px dashed rgba(234, 34, 97, .4);
+}
 
 /* Loading & skeleton */
 .loading {
@@ -481,6 +539,38 @@ body:has(.overlay:not([hidden])) { overflow: hidden; }
   color: var(--ink);
 }
 
+/* Baris detail dengan tombol salin */
+.detail-copy-row { display: flex; align-items: flex-end; gap: 8px; }
+.detail-copy-row > div { flex: 1; min-width: 0; }
+.detail-copy-row .btn { flex: none; }
+
+/* Kode TOTP live */
+.detail-totp {
+  padding: 12px;
+  background: var(--canvas-soft);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-input);
+}
+.totp-code {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 6px 0 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: 5px;
+  color: var(--primary-deep);
+  word-break: break-all;
+}
+.totp-remaining {
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: normal;
+  color: var(--ink-mute);
+}
+
 /* ============ Responsive ============ */
 
 /* Layar sedang: sembunyikan kolom Email agar tabel muat */
@@ -509,6 +599,10 @@ body:has(.overlay:not([hidden])) { overflow: hidden; }
   .toolbar { flex-direction: column; align-items: stretch; }
   .toolbar-spacer { display: none; }
   .toolbar > .btn { width: 100%; }
+  .status-buttons .btn { width: 100%; }
+  .move-folder { width: 100%; min-width: 0; }
+  .folder-bar { flex-direction: column; align-items: stretch; gap: 8px; }
+  .folder-actions .btn { flex: 1; }
   .status-buttons { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .status-buttons .btn { white-space: normal; }
 

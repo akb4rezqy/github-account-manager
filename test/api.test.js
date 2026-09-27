@@ -15,6 +15,10 @@ const logoutFn = require("../api/logout");
 const meFn = require("../api/me");
 const healthFn = require("../api/health");
 const accountsFn = require("../api/accounts");
+const accountIdFn = require("../api/accounts/[id]");
+const restoreFn = require("../api/accounts/[id]/restore");
+const foldersFn = require("../api/folders");
+const folderIdFn = require("../api/folders/[id]");
 
 function mockRes() {
   return {
@@ -139,4 +143,78 @@ test("jalur yang tidak dikenal -> 404", async () => {
   const res = mockRes();
   await accountsFn(vercelReq({ method: "GET", url: "/api/tidak-ada" }), res);
   assert.strictEqual(res.statusCode, 404);
+});
+
+/* ---------- Soft delete / Trash ---------- */
+
+test("route soft delete, permanent delete, dan edit butuh session", async () => {
+  const cases = [
+    { fn: accountIdFn, method: "DELETE", url: "/api/accounts/abc" },
+    { fn: accountIdFn, method: "DELETE", url: "/api/accounts/abc?permanent=1" },
+    { fn: accountIdFn, method: "PUT", url: "/api/accounts/abc", body: { username: "baru" } },
+    { fn: accountIdFn, method: "PUT", url: "/api/accounts/abc/status", body: { status: "sold" } },
+  ];
+  for (const { fn, method, url, body } of cases) {
+    const res = mockRes();
+    await fn(vercelReq({ method, url, body }), res);
+    assert.strictEqual(res.statusCode, 401, `${method} ${url} harus 401 tanpa session`);
+    assert.deepStrictEqual(JSON.parse(res.body), { error: "Unauthorized" });
+  }
+});
+
+test("POST /api/accounts/:id/restore tanpa session -> 401", async () => {
+  const res = mockRes();
+  await restoreFn(vercelReq({ method: "POST", url: "/api/accounts/abc/restore" }), res);
+  assert.strictEqual(res.statusCode, 401);
+  assert.deepStrictEqual(JSON.parse(res.body), { error: "Unauthorized" });
+});
+
+test("GET /api/accounts?trash=1 tanpa session -> 401", async () => {
+  const res = mockRes();
+  await accountsFn(vercelReq({ method: "GET", url: "/api/accounts?trash=1" }), res);
+  assert.strictEqual(res.statusCode, 401);
+});
+
+test("DELETE /api/accounts/trash tanpa session -> 401", async () => {
+  const res = mockRes();
+  await accountIdFn(vercelReq({ method: "DELETE", url: "/api/accounts/trash" }), res);
+  assert.strictEqual(res.statusCode, 401);
+});
+
+test("DELETE /api/accounts/bulk (per status) tanpa session -> 401", async () => {
+  const res = mockRes();
+  await accountsFn(vercelReq({ method: "DELETE", url: "/api/accounts/bulk", body: { status: "sold" } }), res);
+  assert.strictEqual(res.statusCode, 401);
+});
+
+/* ---------- Folder ---------- */
+
+test("CRUD folder tanpa session -> 401", async () => {
+  const cases = [
+    { fn: foldersFn, method: "GET", url: "/api/folders" },
+    { fn: foldersFn, method: "POST", url: "/api/folders", body: { name: "Paket A" } },
+    { fn: folderIdFn, method: "PUT", url: "/api/folders/656e000000000000000000aa", body: { name: "Baru" } },
+    { fn: folderIdFn, method: "DELETE", url: "/api/folders/656e000000000000000000aa" },
+  ];
+  for (const { fn, method, url, body } of cases) {
+    const res = mockRes();
+    await fn(vercelReq({ method, url, body }), res);
+    assert.strictEqual(res.statusCode, 401, `${method} ${url} harus 401 tanpa session`);
+    assert.deepStrictEqual(JSON.parse(res.body), { error: "Unauthorized" });
+  }
+});
+
+test("filter folder & pindah massal tanpa session -> 401", async () => {
+  const cases = [
+    { fn: accountsFn, method: "GET", url: "/api/accounts?folder=none" },
+    { fn: accountsFn, method: "GET", url: "/api/accounts?folder=656e000000000000000000aa" },
+    { fn: accountsFn, method: "GET", url: "/api/statistics?folder=656e000000000000000000aa" },
+    { fn: accountsFn, method: "PUT", url: "/api/accounts/bulk/folder", body: { ids: ["a"], folder_id: null } },
+    { fn: accountsFn, method: "POST", url: "/api/accounts", body: { username: "u", password: "p", folder_id: "656e000000000000000000aa" } },
+  ];
+  for (const { fn, method, url, body } of cases) {
+    const res = mockRes();
+    await fn(vercelReq({ method, url, body }), res);
+    assert.strictEqual(res.statusCode, 401, `${method} ${url} harus 401 tanpa session`);
+  }
 });

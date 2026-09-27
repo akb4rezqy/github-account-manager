@@ -4,7 +4,7 @@
 
 /* ---------- Konstanta & state ---------- */
 const STATUS_LABELS = { available: "Tersedia", available_3d: "3 Hari", sold: "Terjual", personal: "Pribadi" };
-const EMPTY_FORM = { email: "", username: "", password: "", totp: "" };
+const EMPTY_FORM = { email: "", username: "", password: "", totp: "", folder_id: "" };
 
 const STAT_CARDS = [
   { key: "total", label: "Total", icon: "database" },
@@ -12,13 +12,20 @@ const STAT_CARDS = [
   { key: "available_7d", label: "&gt;3 hari", icon: "clock" },
   { key: "sold", label: "Terjual", icon: "wallet" },
   { key: "personal", label: "Pribadi", icon: "user" },
+  { key: "trash", label: "Trash", icon: "trash" },
 ];
 
-const DIALOG_ELEMENTS = { add: "account-dialog", edit: "account-dialog", bulk: "bulk-dialog", detail: "detail-dialog" };
+const DIALOG_ELEMENTS = { add: "account-dialog", edit: "account-dialog", bulk: "bulk-dialog", detail: "detail-dialog", folder: "folder-dialog" };
 
 const state = {
   accounts: [],
-  stats: { total: 0, available_3d: 0, available_7d: 0, sold: 0, personal: 0 },
+  trash: [],
+  folders: [],
+  unassigned: 0,
+  folder: "all",
+  folderDialogMode: "create",
+  folderActive: null,
+  stats: { total: 0, available_3d: 0, available_7d: 0, sold: 0, personal: 0, trash: 0 },
   loading: true,
   search: "",
   filter: "all",
@@ -91,13 +98,28 @@ function showDashboard(username) {
 }
 
 /* ---------- Data ---------- */
+function withFolder(url) {
+  return state.folder === "all" ? url : `${url}?folder=${encodeURIComponent(state.folder)}`;
+}
+
 async function loadData() {
   state.loading = true;
   renderTable();
   try {
-    const [accountData, statData] = await Promise.all([api("/api/accounts"), api("/api/statistics")]);
+    const [accountData, statData, trashData, folderData] = await Promise.all([
+      api(withFolder("/api/accounts")),
+      api(withFolder("/api/statistics")),
+      api("/api/accounts?trash=1"),
+      api("/api/folders"),
+    ]);
     state.accounts = accountData;
     state.stats = statData;
+    state.trash = trashData;
+    state.folders = folderData.folders || [];
+    state.unassigned = folderData.unassigned || 0;
+    if (state.folder !== "all" && state.folder !== "none" && !state.folders.some((f) => f._id === state.folder)) {
+      state.folder = "all";
+    }
     state.selected = new Set([...state.selected].filter((id) => state.accounts.some((a) => a._id === id)));
   } catch (error) {
     showNotice(error instanceof Error ? error.message : "Gagal memuat data");
@@ -105,6 +127,7 @@ async function loadData() {
     state.loading = false;
     renderStats();
     renderTable();
+    renderFolderBar();
   }
 }
 
@@ -122,17 +145,23 @@ function renderStats() {
 
 function filteredAccounts() {
   const query = state.search.toLowerCase();
-  return state.accounts.filter((account) => {
+  const source = state.filter === "trash" ? state.trash : state.accounts;
+  return source.filter((account) => {
     const matchesSearch = !query || account.username.toLowerCase().includes(query) || account.email.toLowerCase().includes(query);
-    return matchesSearch && (state.filter === "all" || account.status === state.filter);
+    return matchesSearch && (state.filter === "all" || state.filter === "trash" || account.status === state.filter);
   });
 }
 
 function renderTable() {
   const rows = filteredAccounts();
+  const trashMode = state.filter === "trash";
   $("shown-count").textContent = rows.length;
   $("selected-count").textContent = state.selected.size;
-  $("select-all").checked = rows.length > 0 && rows.every((a) => state.selected.has(a._id));
+  $("select-all").disabled = trashMode;
+  $("select-all").checked = !trashMode && rows.length > 0 && rows.every((a) => state.selected.has(a._id));
+  $("purge-button").hidden = !trashMode;
+  $("status-buttons").hidden = trashMode;
+  $("take-button").hidden = trashMode;
   if (state.loading) {
     $("table-skeleton").hidden = false;
     $("table-wrap").hidden = true;
@@ -142,17 +171,122 @@ function renderTable() {
   $("table-wrap").hidden = false;
   $("table-body").innerHTML = rows.length ? rows.map((account) => `
     <tr>
-      <td class="col-check"><input type="checkbox" class="row-check" data-id="${account._id}" ${state.selected.has(account._id) ? "checked" : ""}></td>
+      <td class="col-check">${trashMode ? "" : `<input type="checkbox" class="row-check" data-id="${account._id}" ${state.selected.has(account._id) ? "checked" : ""}>`}</td>
       <td class="cell-strong">${esc(account.username)}</td>
       <td>${esc(account.email || "-")}</td>
       <td class="num">${account.days} hari</td>
-      <td><span class="tag" data-status="${account.status}">${esc(STATUS_LABELS[account.status] || account.status)}</span></td>
-      <td class="col-actions">
-        <button class="btn btn-ghost btn-sm" data-action="detail" data-id="${account._id}">Detail</button>
-        <button class="btn btn-ghost btn-sm btn-icon" data-action="edit" data-id="${account._id}" title="Edit">${icon("edit")}</button>
-        <button class="btn btn-ghost btn-sm btn-icon btn-danger" data-action="delete" data-id="${account._id}" title="Hapus">${icon("trash")}</button>
-      </td>
-    </tr>`).join("") : '<tr><td colspan="6" class="empty-row">Tidak ada akun yang cocok dengan pencarian atau filter</td></tr>';
+      <td>${trashMode
+        ? `<span class="tag" data-status="deleted">Dihapus ${new Date(account.deleted_at).toLocaleDateString("id-ID")}</span>`
+        : `<span class="tag" data-status="${account.status}">${esc(STATUS_LABELS[account.status] || account.status)}</span>`}</td>
+      <td class="col-actions">${trashMode
+        ? `<button class="btn btn-ghost btn-sm" data-action="restore" data-id="${account._id}">Pulihkan</button>
+           <button class="btn btn-ghost btn-sm btn-icon btn-danger" data-action="purge" data-id="${account._id}" title="Hapus permanen">${icon("trash")}</button>`
+        : `<button class="btn btn-ghost btn-sm" data-action="detail" data-id="${account._id}">Detail</button>
+           <button class="btn btn-ghost btn-sm btn-icon" data-action="edit" data-id="${account._id}" title="Edit">${icon("edit")}</button>
+           <button class="btn btn-ghost btn-sm btn-icon btn-danger" data-action="delete" data-id="${account._id}" title="Hapus">${icon("trash")}</button>`}</td>
+    </tr>`).join("") : `<tr><td colspan="6" class="empty-row">${trashMode ? "Trash kosong" : "Tidak ada akun yang cocok dengan pencarian atau filter"}</td></tr>`;
+}
+
+/* ---------- Folder ---------- */
+function renderFolderBar() {
+  const trashMode = state.filter === "trash";
+  const chip = (value, label, count) => `
+    <button class="folder-chip${state.folder === value ? " is-active" : ""}" data-folder="${esc(value)}" ${trashMode ? "disabled" : ""}>
+      ${esc(label)} <span class="folder-count">${count}</span>
+    </button>`;
+  const totalLive = state.folders.reduce((sum, folder) => sum + folder.count, 0) + state.unassigned;
+  $("folder-chips").innerHTML = [
+    chip("all", "Semua", totalLive),
+    chip("none", "Tanpa folder", state.unassigned),
+    ...state.folders.map((folder) => chip(folder._id, folder.name, folder.count)),
+    `<button class="folder-chip folder-chip-add" id="folder-add-chip" ${trashMode ? "disabled" : ""}>+ Folder</button>`,
+  ].join("");
+  state.folderActive =
+    state.folder !== "all" && state.folder !== "none"
+      ? state.folders.find((folder) => folder._id === state.folder) || null
+      : null;
+  $("folder-actions").hidden = !state.folderActive || trashMode;
+  renderMoveSelect();
+}
+
+function renderMoveSelect() {
+  const select = $("move-folder-select");
+  const previous = select.value;
+  select.innerHTML =
+    '<option value="">Pindah ke folder…</option><option value="none">Tanpa folder</option>' +
+    state.folders.map((folder) => `<option value="${esc(folder._id)}">${esc(folder.name)}</option>`).join("");
+  if ([...select.options].some((option) => option.value === previous)) select.value = previous;
+  select.hidden = state.filter === "trash";
+}
+
+function openFolderDialog(mode, folder) {
+  state.folderDialogMode = mode;
+  state.folderActive = folder || null;
+  $("folder-dialog-title").textContent = mode === "rename" ? "Ganti Nama Folder" : "Folder Baru";
+  $("field-folder-name").value = mode === "rename" && folder ? folder.name : "";
+  openDialog("folder");
+  $("field-folder-name").focus();
+  $("field-folder-name").select();
+}
+
+async function saveFolder() {
+  const name = $("field-folder-name").value.trim();
+  if (!name) return showNotice("Nama folder wajib diisi");
+  const button = $("folder-save-button");
+  button.disabled = true;
+  try {
+    const options = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) };
+    if (state.folderDialogMode === "rename" && state.folderActive) {
+      options.method = "PUT";
+      await api(`/api/folders/${state.folderActive._id}`, options);
+      showNotice("Nama folder diperbarui");
+    } else {
+      await api("/api/folders", options);
+      showNotice("Folder dibuat");
+    }
+    closeDialog();
+    await loadData();
+  } catch (error) {
+    showNotice(error instanceof Error ? error.message : "Gagal menyimpan folder");
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function deleteFolder() {
+  const folder = state.folderActive;
+  if (!folder) return;
+  if (!confirm(`Hapus folder "${folder.name}"? Akun di dalamnya TIDAK ikut terhapus, hanya dipindah ke "Tanpa folder".`)) return;
+  try {
+    const result = await api(`/api/folders/${folder._id}`, { method: "DELETE" });
+    if (state.folder === folder._id) state.folder = "all";
+    showNotice(`Folder dihapus, ${result.detached || 0} akun dipindah ke Tanpa folder`);
+    await loadData();
+  } catch (error) {
+    showNotice(error instanceof Error ? error.message : "Gagal menghapus folder");
+  }
+}
+
+async function moveSelectedToFolder(value) {
+  const ids = [...state.selected];
+  if (!ids.length) {
+    $("move-folder-select").value = "";
+    return showNotice("Pilih minimal satu akun");
+  }
+  try {
+    await api("/api/accounts/bulk/folder", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids, folder_id: value === "none" ? null : value }),
+    });
+    state.selected = new Set();
+    $("move-folder-select").value = "";
+    showNotice(`${ids.length} akun dipindah`);
+    await loadData();
+  } catch (error) {
+    $("move-folder-select").value = "";
+    showNotice(error instanceof Error ? error.message : "Gagal memindahkan akun");
+  }
 }
 
 let noticeTimer;
@@ -174,6 +308,10 @@ function openDialog(name) {
     $("field-username").value = state.form.username;
     $("field-password").value = state.form.password;
     $("field-totp").value = state.form.totp;
+    $("field-folder").innerHTML =
+      '<option value="">Tanpa folder</option>' +
+      state.folders.map((folder) => `<option value="${esc(folder._id)}">${esc(folder.name)}</option>`).join("");
+    $("field-folder").value = state.form.folder_id || "";
     (name === "edit" ? $("field-username") : $("field-email")).focus();
   } else if (name === "bulk") {
     $("bulk-textarea").focus();
@@ -183,25 +321,83 @@ function openDialog(name) {
 function closeDialog() {
   document.querySelectorAll(".overlay").forEach((el) => { el.hidden = true; });
   state.dialog = null;
+  stopTotpLive();
 }
 
 function openEdit(account) {
   state.active = account;
-  state.form = { email: account.email, username: account.username, password: account.password, totp: account.totp };
+  state.form = {
+    email: account.email,
+    username: account.username,
+    password: account.password,
+    totp: account.totp,
+    folder_id: account.folder_id || "",
+  };
   openDialog("edit");
 }
 
 function openDetail(account) {
   const row = (label, value) => `<div><p class="detail-label">${esc(label)}</p><p class="detail-value">${esc(value)}</p></div>`;
+  const copyRow = (label, value) => `
+    <div class="detail-copy-row">
+      <div><p class="detail-label">${esc(label)}</p><p class="detail-value">${esc(value)}</p></div>
+      <button class="btn btn-ghost btn-sm" data-copy="${esc(value)}">Salin</button>
+    </div>`;
+  const folder = state.folders.find((item) => item._id === account.folder_id);
   $("detail-body").innerHTML = [
     row("Username", account.username),
     row("Email", account.email || "-"),
-    row("Password", account.password),
-    row("TOTP", account.totp || "-"),
+    row("Folder", folder ? folder.name : "Tanpa folder"),
+    copyRow("Password", account.password),
+    copyRow("Secret TOTP", account.totp || "-"),
+    `<div class="detail-totp">
+       <p class="detail-label">Kode TOTP (6 digit, refresh otomatis)</p>
+       <p class="totp-code"><span id="detail-totp-code">-</span><span class="totp-remaining" id="detail-totp-remaining"></span></p>
+       <button class="btn btn-ghost btn-sm" data-copy-target="detail-totp-code">Salin kode</button>
+     </div>`,
     row("Status", STATUS_LABELS[account.status] || account.status),
     row("Dibuat", new Date(account.created_at).toLocaleString("id-ID")),
   ].join("");
   openDialog("detail");
+  startTotpLive(account);
+}
+
+/* ---------- Live TOTP (kode 6 digit diturunkan dari secret, secret tetap utuh) ---------- */
+let totpTimer = null;
+
+function stopTotpLive() {
+  clearInterval(totpTimer);
+  totpTimer = null;
+}
+
+async function refreshTotpLive(account) {
+  const codeEl = $("detail-totp-code");
+  const remainEl = $("detail-totp-remaining");
+  if (!codeEl || !remainEl) return stopTotpLive();
+  if (!account.totp) {
+    codeEl.textContent = "-";
+    remainEl.textContent = "Akun ini belum punya secret";
+    return;
+  }
+  try {
+    const result = await TOTP.generate(account.totp);
+    if (!result) {
+      codeEl.textContent = "-";
+      remainEl.textContent = "Secret bukan base32 valid";
+      return;
+    }
+    codeEl.textContent = result.code;
+    remainEl.textContent = `${result.remaining}s lagi`;
+  } catch {
+    codeEl.textContent = "-";
+    remainEl.textContent = "Gagal menghitung kode";
+  }
+}
+
+function startTotpLive(account) {
+  stopTotpLive();
+  void refreshTotpLive(account);
+  totpTimer = setInterval(() => void refreshTotpLive(account), 1000);
 }
 
 /* ---------- Actions ---------- */
@@ -211,6 +407,7 @@ async function saveAccount() {
     username: $("field-username").value,
     password: $("field-password").value,
     totp: $("field-totp").value,
+    folder_id: $("field-folder").value || null,
   };
   const button = $("save-account-button");
   button.disabled = true;
@@ -245,7 +442,11 @@ async function addBulk() {
   const button = $("bulk-submit-button");
   button.disabled = true;
   try {
-    await api("/api/accounts/bulk", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accounts: parsed }) });
+    const body = JSON.stringify({
+      accounts: parsed,
+      folder_id: state.folder !== "all" && state.folder !== "none" ? state.folder : null,
+    });
+    await api("/api/accounts/bulk", { method: "POST", headers: { "Content-Type": "application/json" }, body });
     $("bulk-textarea").value = "";
     closeDialog();
     showNotice(`${parsed.length} akun ditambahkan`);
@@ -258,13 +459,46 @@ async function addBulk() {
 }
 
 async function deleteAccount(account) {
-  if (!confirm(`Hapus ${account.username}?`)) return;
+  if (!confirm(`Pindahkan ${account.username} ke Trash? Masih bisa dipulihkan.`)) return;
   try {
     await api(`/api/accounts/${account._id}`, { method: "DELETE" });
-    showNotice("Akun dihapus");
+    showNotice("Akun dipindahkan ke Trash");
     await loadData();
   } catch (error) {
     showNotice(error instanceof Error ? error.message : "Gagal menghapus");
+  }
+}
+
+async function restoreAccount(account) {
+  try {
+    await api(`/api/accounts/${account._id}/restore`, { method: "POST" });
+    showNotice(`${account.username} dipulihkan dari Trash`);
+    await loadData();
+  } catch (error) {
+    showNotice(error instanceof Error ? error.message : "Gagal memulihkan akun");
+  }
+}
+
+async function purgeAccount(account) {
+  if (!confirm(`Hapus permanen ${account.username}? Tidak bisa dibatalkan.`)) return;
+  try {
+    await api(`/api/accounts/${account._id}?permanent=1`, { method: "DELETE" });
+    showNotice("Akun dihapus permanen");
+    await loadData();
+  } catch (error) {
+    showNotice(error instanceof Error ? error.message : "Gagal menghapus permanen");
+  }
+}
+
+async function purgeTrash() {
+  if (!state.trash.length) return showNotice("Trash kosong");
+  if (!confirm(`Hapus permanen semua akun di Trash (${state.trash.length})? Tidak bisa dibatalkan.`)) return;
+  try {
+    const result = await api("/api/accounts/trash", { method: "DELETE" });
+    showNotice(`${result.purged || 0} akun dihapus permanen`);
+    await loadData();
+  } catch (error) {
+    showNotice(error instanceof Error ? error.message : "Gagal mengosongkan trash");
   }
 }
 
@@ -363,10 +597,33 @@ function wireEvents() {
 
   $("filter-select").innerHTML = '<option value="all">Semua status</option>' + Object.entries(STATUS_LABELS)
     .map(([value, label]) => `<option value="${value}">${esc(label)}</option>`)
-    .join("");
+    .join("") + '<option value="trash">Trash</option>';
   $("filter-select").addEventListener("change", (event) => {
     state.filter = event.target.value;
     renderTable();
+    renderFolderBar();
+  });
+
+  $("folder-chips").addEventListener("click", (event) => {
+    const chip = event.target.closest("[data-folder]");
+    if (chip && !chip.disabled) {
+      state.folder = chip.dataset.folder;
+      state.selected = new Set();
+      void loadData();
+      return;
+    }
+    if (event.target.closest("#folder-add-chip")) openFolderDialog("create");
+  });
+  $("folder-rename-button").addEventListener("click", () => {
+    if (state.folderActive) openFolderDialog("rename", state.folderActive);
+  });
+  $("folder-delete-button").addEventListener("click", () => void deleteFolder());
+  $("folder-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    void saveFolder();
+  });
+  $("move-folder-select").addEventListener("change", (event) => {
+    if (event.target.value) void moveSelectedToFolder(event.target.value);
   });
 
   $("select-all").addEventListener("change", (event) => {
@@ -386,11 +643,29 @@ function wireEvents() {
   $("table-body").addEventListener("click", (event) => {
     const button = event.target.closest("[data-action]");
     if (!button) return;
-    const account = state.accounts.find((a) => a._id === button.dataset.id);
+    const list = state.filter === "trash" ? state.trash : state.accounts;
+    const account = list.find((a) => a._id === button.dataset.id);
     if (!account) return;
     if (button.dataset.action === "detail") openDetail(account);
     else if (button.dataset.action === "edit") openEdit(account);
     else if (button.dataset.action === "delete") void deleteAccount(account);
+    else if (button.dataset.action === "restore") void restoreAccount(account);
+    else if (button.dataset.action === "purge") void purgeAccount(account);
+  });
+
+  $("purge-button").addEventListener("click", () => void purgeTrash());
+
+  document.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-copy], [data-copy-target]");
+    if (!button) return;
+    const target = button.dataset.copyTarget;
+    const value = target ? ($(target) ? $(target).textContent : "") : button.dataset.copy;
+    try {
+      await navigator.clipboard.writeText(String(value).trim());
+      showNotice("Disalin ke clipboard");
+    } catch {
+      showNotice("Gagal menyalin");
+    }
   });
 
   $("account-form").addEventListener("submit", (event) => {

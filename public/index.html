@@ -57,8 +57,20 @@
         <button class="btn btn-primary" id="add-button" data-icon="plus">Tambah Akun</button>
         <button class="btn btn-secondary" id="bulk-button" data-icon="database">Bulk Add</button>
         <button class="btn btn-secondary" id="take-button" data-icon="download">Ambil Akun</button>
+        <button class="btn btn-ghost btn-danger" id="purge-button" data-icon="trash" hidden>Kosongkan Trash</button>
         <span class="toolbar-spacer"></span>
         <div id="status-buttons" class="status-buttons"></div>
+        <select class="input select move-folder" id="move-folder-select" aria-label="Pindahkan akun terpilih ke folder">
+          <option value="">Pindah ke folder…</option>
+        </select>
+      </div>
+
+      <div class="folder-bar" id="folder-bar">
+        <div class="folder-chips" id="folder-chips" role="group" aria-label="Daftar folder"></div>
+        <div class="folder-actions" id="folder-actions" hidden>
+          <button class="btn btn-ghost btn-sm" id="folder-rename-button">Ganti nama</button>
+          <button class="btn btn-ghost btn-sm btn-danger" id="folder-delete-button">Hapus folder</button>
+        </div>
       </div>
 
       <section class="card">
@@ -116,6 +128,7 @@
         <label class="form-field">Username<input class="input" id="field-username" placeholder="Username" autocomplete="off"></label>
         <label class="form-field">Password<input class="input" id="field-password" placeholder="Password" autocomplete="off"></label>
         <label class="form-field">TOTP (opsional)<input class="input" id="field-totp" placeholder="TOTP (opsional)" autocomplete="off"></label>
+        <label class="form-field">Folder<select class="input select" id="field-folder"></select></label>
         <button class="btn btn-primary btn-block" type="submit" id="save-account-button">Simpan</button>
       </form>
       <button class="dialog-close" type="button" data-close="account-dialog" title="Tutup">&times;</button>
@@ -126,7 +139,7 @@
   <div class="overlay" id="bulk-dialog" hidden>
     <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="bulk-dialog-title">
       <h3 id="bulk-dialog-title">Bulk Add</h3>
-      <p class="dialog-desc">Format: email:username:password:totp atau username:password:totp.</p>
+      <p class="dialog-desc">Format: email:username:password:totp atau username:password:totp. Akun masuk ke folder yang sedang aktif.</p>
       <div class="dialog-body">
         <label class="form-field">Daftar akun<textarea class="textarea" id="bulk-textarea" rows="10" placeholder="email@example.com:username:password:totp"></textarea></label>
         <button class="btn btn-primary btn-block" type="button" id="bulk-submit-button">Tambahkan Semua</button>
@@ -145,6 +158,20 @@
     </div>
   </div>
 
+  <!-- ============ DIALOG: FOLDER ============ -->
+  <div class="overlay" id="folder-dialog" hidden>
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="folder-dialog-title">
+      <h3 id="folder-dialog-title">Folder Baru</h3>
+      <p class="dialog-desc">Kelompokkan akun ke dalam folder, misalnya per paket atau sumber.</p>
+      <form class="dialog-body" id="folder-form">
+        <label class="form-field">Nama folder<input class="input" id="field-folder-name" placeholder="Nama folder" maxlength="60" autocomplete="off" required></label>
+        <button class="btn btn-primary btn-block" type="submit" id="folder-save-button">Simpan</button>
+      </form>
+      <button class="dialog-close" type="button" data-close="folder-dialog" title="Tutup">&times;</button>
+    </div>
+  </div>
+
+  <script src="/totp.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>
