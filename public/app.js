@@ -25,6 +25,9 @@ const state = {
   folder: "all",
   folderDialogMode: "create",
   folderActive: null,
+  view: "dashboard",
+  activity: { entries: [], canUndo: false, canRedo: false, undoSummary: "", redoSummary: "" },
+  activityLoading: false,
   stats: { total: 0, available_3d: 0, available_7d: 0, sold: 0, personal: 0, trash: 0 },
   loading: true,
   search: "",
@@ -86,15 +89,25 @@ async function api(url, options) {
 /* ---------- Views ---------- */
 function showLogin() {
   closeDialog();
-  $("dashboard-view").hidden = true;
+  $("app-shell").hidden = true;
   $("login-view").hidden = false;
 }
 
 function showDashboard(username) {
   $("session-username").textContent = username;
   $("login-view").hidden = true;
-  $("dashboard-view").hidden = false;
+  $("app-shell").hidden = false;
+  showView("dashboard");
   void loadData();
+}
+
+function showView(name) {
+  state.view = name;
+  $("dashboard-view").hidden = name !== "dashboard";
+  $("activity-view").hidden = name !== "activity";
+  $("nav-dashboard").classList.toggle("is-active", name === "dashboard");
+  $("nav-activity").classList.toggle("is-active", name === "activity");
+  if (name === "activity") void loadActivity();
 }
 
 /* ---------- Data ---------- */
@@ -286,6 +299,108 @@ async function moveSelectedToFolder(value) {
   } catch (error) {
     $("move-folder-select").value = "";
     showNotice(error instanceof Error ? error.message : "Gagal memindahkan akun");
+  }
+}
+
+/* ---------- Activity log / undo-redo ---------- */
+const ACTIVITY_ICONS = {
+  "account.create": "plus",
+  "account.edit": "edit",
+  "account.status": "check",
+  "account.take": "download",
+  "account.soft-delete": "trash",
+  "account.permanent-delete": "trash",
+  "account.purge": "trash",
+  "account.restore": "refresh",
+  "account.move-folder": "database",
+  "folder.create": "plus",
+  "folder.rename": "edit",
+  "folder.delete": "trash",
+};
+
+function timeAgo(iso) {
+  const diff = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(diff)) return "";
+  const minute = 60000;
+  const hour = 3600000;
+  const day = 86400000;
+  if (diff < minute) return "baru saja";
+  if (diff < hour) return `${Math.floor(diff / minute)} menit lalu`;
+  if (diff < day) return `${Math.floor(diff / hour)} jam lalu`;
+  if (diff < 7 * day) return `${Math.floor(diff / day)} hari lalu`;
+  return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+}
+
+async function loadActivity() {
+  state.activityLoading = true;
+  renderActivity();
+  try {
+    state.activity = await api("/api/activity?limit=200");
+  } catch (error) {
+    showNotice(error instanceof Error ? error.message : "Gagal memuat aktivitas");
+  } finally {
+    state.activityLoading = false;
+    renderActivity();
+  }
+}
+
+function renderActivity() {
+  const { entries, canUndo, canRedo, undoSummary, redoSummary } = state.activity;
+  $("undo-button").disabled = !canUndo;
+  $("redo-button").disabled = !canRedo;
+  $("undo-button").title = undoSummary ? `Batalkan: ${undoSummary}` : "Tidak ada aksi yang bisa dibatalkan";
+  $("redo-button").title = redoSummary ? `Ulangi: ${redoSummary}` : "Tidak ada aksi yang bisa diulangi";
+  const hint = [];
+  if (undoSummary) hint.push(`Siap dibatalkan: ${undoSummary}`);
+  if (redoSummary) hint.push(`Siap diulangi: ${redoSummary}`);
+  $("activity-hint").textContent = hint.length ? hint.join(" · ") : "Belum ada aktivitas yang tercatat.";
+  if (state.activityLoading) {
+    $("activity-skeleton").hidden = false;
+    $("activity-list").hidden = true;
+    return;
+  }
+  $("activity-skeleton").hidden = true;
+  $("activity-list").hidden = false;
+  $("activity-list").innerHTML = entries.length ? entries.map((entry) => {
+    const badge = entry.superseded
+      ? '<span class="activity-badge" data-state="superseded">Digantikan</span>'
+      : entry.undone
+        ? '<span class="activity-badge" data-state="undone">Dibatalkan</span>'
+        : '<span class="activity-badge" data-state="done">Aktif</span>';
+    const meta = [entry.actor || "sistem", timeAgo(entry.created_at), entry.affected_count ? `${entry.affected_count} akun` : ""]
+      .filter(Boolean)
+      .join(" · ");
+    return `
+      <div class="activity-item">
+        <span class="activity-icon">${icon(ACTIVITY_ICONS[entry.type] || "clock", 16)}</span>
+        <div class="activity-main">
+          <p class="activity-summary">${esc(entry.summary)}</p>
+          <p class="activity-meta">${esc(meta)}</p>
+        </div>
+        ${badge}
+      </div>`;
+  }).join("") : '<p class="empty-row">Belum ada aktivitas.</p>';
+}
+
+async function undoActivity() {
+  try {
+    const result = await api("/api/activity/undo", { method: "POST" });
+    showNotice(`Dibatalkan: ${result.summary} (${result.applied}/${result.total} diterapkan)`);
+    await loadData();
+    await loadActivity();
+  } catch (error) {
+    showNotice(error instanceof Error ? error.message : "Gagal membatalkan aksi");
+  }
+}
+
+async function redoActivity() {
+  try {
+    const result = await api("/api/activity/redo", { method: "POST" });
+    showNotice(`Diulangi: ${result.summary} (${result.applied}/${result.total} diterapkan)`);
+    await loadData();
+    await loadActivity();
+  } catch (error) {
+    showNotice(error instanceof Error ? error.message : "Gagal mengulangi aksi");
   }
 }
 
@@ -530,6 +645,36 @@ async function takeAccounts() {
     anchor.click();
     URL.revokeObjectURL(url);
   }
+  const ids = chosen.map((account) => account._id);
+  try {
+    await api("/api/accounts/bulk/status", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids, status: "sold", context: "take" }),
+    });
+    state.selected = new Set();
+    await loadData();
+  } catch (error) {
+    showNotice(error instanceof Error ? error.message : "Gagal menandai akun terjual");
+  }
+}
+
+async function takeAccounts() {
+  const chosen = state.accounts.filter((account) => state.selected.has(account._id) && ["available", "available_3d"].includes(account.status));
+  if (!chosen.length) return showNotice("Pilih akun tersedia yang ingin diambil");
+  const text = chosen.map((account) => `${account.email}:${account.username}:${account.password}:${account.totp}`).join("\n");
+  try {
+    await navigator.clipboard.writeText(text);
+    showNotice(`${chosen.length} akun disalin ke clipboard`);
+  } catch {
+    const blob = new Blob([text], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `akun_${new Date().toISOString().slice(0, 10)}.txt`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
   await updateSelectedStatus("sold", chosen.map((account) => account._id));
 }
 
@@ -577,6 +722,11 @@ function wireEvents() {
   $("refresh-button").addEventListener("click", () => void loadData());
   $("logout-button").addEventListener("click", () => void logout());
   $("notice-close").addEventListener("click", () => { $("notice").hidden = true; });
+
+  $("nav-dashboard").addEventListener("click", () => showView("dashboard"));
+  $("nav-activity").addEventListener("click", () => showView("activity"));
+  $("undo-button").addEventListener("click", () => void undoActivity());
+  $("redo-button").addEventListener("click", () => void redoActivity());
 
   $("add-button").addEventListener("click", () => openDialog("add"));
   $("bulk-button").addEventListener("click", () => openDialog("bulk"));
@@ -684,6 +834,16 @@ function wireEvents() {
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closeDialog();
+    const modifier = event.ctrlKey || event.metaKey;
+    const key = String(event.key || "").toLowerCase();
+    if (!modifier || event.repeat) return;
+    if (key === "z" || key === "y") {
+      if (event.target.closest("input, textarea, select, [contenteditable]")) return;
+      if (!$("login-view").hidden) return;
+      event.preventDefault();
+      if (key === "y" || event.shiftKey) void redoActivity();
+      else void undoActivity();
+    }
   });
 }
 

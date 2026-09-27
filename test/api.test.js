@@ -19,6 +19,9 @@ const accountIdFn = require("../api/accounts/[id]");
 const restoreFn = require("../api/accounts/[id]/restore");
 const foldersFn = require("../api/folders");
 const folderIdFn = require("../api/folders/[id]");
+const activityFn = require("../api/activity");
+const activityUndoFn = require("../api/activity/undo");
+const activityRedoFn = require("../api/activity/redo");
 
 function mockRes() {
   return {
@@ -216,5 +219,21 @@ test("filter folder & pindah massal tanpa session -> 401", async () => {
     const res = mockRes();
     await fn(vercelReq({ method, url, body }), res);
     assert.strictEqual(res.statusCode, 401, `${method} ${url} harus 401 tanpa session`);
+  }
+});
+
+/* ---------- Activity log / undo-redo ---------- */
+
+test("activity, undo, redo tanpa session -> 401", async () => {
+  const cases = [
+    { fn: activityFn, method: "GET", url: "/api/activity" },
+    { fn: activityUndoFn, method: "POST", url: "/api/activity/undo" },
+    { fn: activityRedoFn, method: "POST", url: "/api/activity/redo" },
+  ];
+  for (const { fn, method, url } of cases) {
+    const res = mockRes();
+    await fn(vercelReq({ method, url }), res);
+    assert.strictEqual(res.statusCode, 401, `${method} ${url} harus 401 tanpa session`);
+    assert.deepStrictEqual(JSON.parse(res.body), { error: "Unauthorized" });
   }
 });

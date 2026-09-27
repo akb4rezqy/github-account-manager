@@ -12,6 +12,7 @@ Secure account stock dashboard built with **native HTML, CSS, and JavaScript** �
 - Account folders: group accounts by package/source with chips navigation, per-folder statistics, bulk move, rename, and delete (accounts are detached, never deleted)
 - Soft delete with Trash view: restore or purge permanently (auto-purge after 30 days)
 - Live TOTP codes (RFC 6238, 6 digit, refresh every 30s) derived from the stored secret — the 16-digit secret is never modified
+- Activity log with undo/redo: every data mutation (create, edit, status, take, trash, purge, folders) is recorded and reversible (Ctrl+Z / Ctrl+Shift+Z), max 200 entries
 - Bulk account import
 - Bulk status updates
 - Copy/download selected available accounts and mark them sold
@@ -87,6 +88,16 @@ Trashed accounts are excluded from listings, statistics, edits, and status updat
 | `PUT` | `/api/accounts/bulk/folder` | Move selected accounts (`{ ids, folder_id }`) |
 
 Bulk import (`POST /api/accounts/bulk`) accepts an optional `folder_id` applied to every imported account.
+
+### Activity log endpoints
+
+| Method | Endpoint | Effect |
+| --- | --- | --- |
+| `GET` | `/api/activity?limit=200` | Recent entries + `canUndo`, `canRedo`, `undoSummary`, `redoSummary` |
+| `POST` | `/api/activity/undo` | Undo the newest active entry |
+| `POST` | `/api/activity/redo` | Redo the newest undone entry |
+
+Every mutation stores inverse operations (`undo`/`redo`), so reverting applies the recorded operation instead of free-form text. A new mutation supersedes any pending redo (redo stack is discarded), and only the newest active entry is undoable — repeated `undo` walks back through history. Entries are trimmed to the newest 200. The API returns DTOs without the raw operation payload.
 
 ### Self-hosting (VPS / PaaS)
 

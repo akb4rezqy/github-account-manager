@@ -28,23 +28,30 @@
     </section>
   </main>
 
+  <!-- ============ APP SHELL (setelah login) ============ -->
+  <div id="app-shell" hidden>
+
+    <header class="topbar topbar-app">
+      <div class="topbar-brand">
+        <span class="topbar-logo" data-icon="github" data-icon-size="30"></span>
+        <div>
+          <h1>Stock Manager</h1>
+          <p>Signed in as <span id="session-username"></span></p>
+        </div>
+      </div>
+      <nav class="view-tabs" aria-label="Navigasi utama">
+        <button class="btn btn-on-dark is-active" id="nav-dashboard">Dashboard</button>
+        <button class="btn btn-on-dark" id="nav-activity">Aktivitas</button>
+      </nav>
+      <div class="topbar-actions">
+        <button class="btn btn-on-dark" id="refresh-button" data-icon="refresh">Refresh</button>
+        <button class="btn btn-on-dark" id="logout-button" data-icon="logout">Logout</button>
+      </div>
+    </header>
+
   <!-- ============ DASHBOARD VIEW ============ -->
   <main id="dashboard-view" class="dashboard" hidden>
     <div class="dashboard-inner">
-
-      <header class="topbar">
-        <div class="topbar-brand">
-          <span class="topbar-logo" data-icon="github" data-icon-size="30"></span>
-          <div>
-            <h1>Stock Manager</h1>
-            <p>Signed in as <span id="session-username"></span></p>
-          </div>
-        </div>
-        <div class="topbar-actions">
-          <button class="btn btn-on-dark" id="refresh-button" data-icon="refresh">Refresh</button>
-          <button class="btn btn-on-dark" id="logout-button" data-icon="logout">Logout</button>
-        </div>
-      </header>
 
       <div id="notice" class="notice" hidden>
         <span id="notice-text"></span>
@@ -117,6 +124,35 @@
 
     </div>
   </main>
+
+  <!-- ============ ACTIVITY VIEW ============ -->
+  <main id="activity-view" class="dashboard" hidden>
+    <div class="dashboard-inner">
+
+      <section class="card activity-head">
+        <div>
+          <h2>Riwayat Aktivitas</h2>
+          <p class="table-sub" id="activity-hint">Semua perubahan tercatat di sini dan bisa dibatalkan.</p>
+        </div>
+        <div class="activity-actions">
+          <button class="btn btn-secondary btn-sm" id="undo-button">Undo</button>
+          <button class="btn btn-secondary btn-sm" id="redo-button">Redo</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="table-skeleton" id="activity-skeleton">
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+        </div>
+        <div id="activity-list" class="activity-list" hidden></div>
+      </section>
+
+    </div>
+  </main>
+
+  </div><!-- /#app-shell -->
 
   <!-- ============ DIALOG: TAMBAH / EDIT ============ -->
   <div class="overlay" id="account-dialog" hidden>
