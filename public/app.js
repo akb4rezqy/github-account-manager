@@ -185,10 +185,10 @@ function renderTable() {
   $("table-body").innerHTML = rows.length ? rows.map((account) => `
     <tr>
       <td class="col-check">${trashMode ? "" : `<input type="checkbox" class="row-check" data-id="${account._id}" ${state.selected.has(account._id) ? "checked" : ""}>`}</td>
-      <td class="cell-strong">${esc(account.username)}</td>
-      <td>${esc(account.email || "-")}</td>
-      <td class="num">${account.days} hari</td>
-      <td>${trashMode
+      <td class="cell-strong" data-label="Username">${esc(account.username)}</td>
+      <td data-label="Email">${esc(account.email || "-")}</td>
+      <td class="num" data-label="Umur">${account.days} hari</td>
+      <td data-label="Status">${trashMode
         ? `<span class="tag" data-status="deleted">Dihapus ${new Date(account.deleted_at).toLocaleDateString("id-ID")}</span>`
         : `<span class="tag" data-status="${account.status}">${esc(STATUS_LABELS[account.status] || account.status)}</span>`}</td>
       <td class="col-actions">${trashMode
